@@ -1,12 +1,12 @@
 import os
 import json
 import datetime
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 
 # --- PDF Oluşturma Kütüphaneleri ---
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm # Milimetre birimini ekledik
+from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -14,154 +14,169 @@ from reportlab.pdfbase.ttfonts import TTFont
 # --- Flask Sunucusunu Başlat ---
 app = Flask(__name__)
 
-# --- ÇIKARTMA KAĞIDI ÖLÇÜLERİ (Google Docs'tan gelen) ---
-# 1 inç = 25.4 mm
-TOP_MARGIN = 0.24 * 25.4 * mm        # A) Üst Boşluk
-LEFT_MARGIN = 0.18 * 25.4 * mm       # B) Sol Boşluk
-ETIKET_GENISLIK = 3.902 * 25.4 * mm  # C) Etiket Genişliği
-ETIKET_YUKSEKLIK = 2.244 * 25.4 * mm # D) Etiket Yüksekliği
-HORIZONTAL_GUTTER = 0 * mm           # E) Yatay Boşluk
-VERTICAL_GUTTER = 0 * mm             # F) Dikey Boşluk
+# --- ÇIKARTMA KAĞIDI ÖLÇÜLERİ (Tanex şablonuyla aynı) ---
+TOP_MARGIN = 0.24 * 25.4 * mm
+LEFT_MARGIN = 0.18 * 25.4 * mm
+ETIKET_GENISLIK = 3.902 * 25.4 * mm
+ETIKET_YUKSEKLIK = 2.244 * 25.4 * mm
+HORIZONTAL_GUTTER = 0 * mm
+VERTICAL_GUTTER = 0 * mm
+PDF_FILE_NAME = "etiket.pdf" # Sabit dosya adı
 
 # --- Türkçe Fontları Kaydet ---
 try:
     pdfmetrics.registerFont(TTFont('Arial', 'C:/Windows/Fonts/arial.ttf'))
     pdfmetrics.registerFont(TTFont('Arial-Bold', 'C:/Windows/Fonts/arialbd.ttf'))
 except:
-    print("UYARI: Arial fontları bulunamadı. Yazılar farklı görünebilir.")
+    print("UYARI: Arial fontları bulunamadı.")
 
 # --- PDF ETİKET OLUŞTURMA FONKSİYONU ---
-
-def create_labels_pdf(spice_name, page_count):
-    pdf_file_name = "etiket.pdf"
-    
-    # Tarihleri hesapla
-    today = datetime.date.today()
-    uret_tarihi = today.strftime("%d.%m.%Y")
-    # Son kullanma tarihini 2 yıl sonrası olarak ayarla
-    stt_tarihi = (today.replace(year=today.year + 2)).strftime("%d.%m.%Y")
-    parti_no = uret_tarihi.replace(".", "") # Parti No: GÜNAYYIL
-
+# (Hizalama mantığı app-test.py'den kopyalandı)
+def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
     PAGE_W, PAGE_H = A4
-    c = canvas.Canvas(pdf_file_name, pagesize=A4)
+    c = canvas.Canvas(PDF_FILE_NAME, pagesize=A4)
     
-    # --- TEK BİR ETİKETİ ÇİZEN FONKSİYON (Güncellendi) ---
+    # --- TEK BİR ETİKETİ ÇİZEN FONKSİYON (app-test.py'deki son haliniz) ---
     def draw_single_label(x_base, y_base, genislik, yukseklik, baharat_adi):
-        # x_base ve y_base, etiketin SOL ALT köşesinin koordinatlarıdır
-        # Tüm içerik bu sınırlar içinde ortalanacak
-        
         x_center = x_base + genislik / 2
         
-        # --- 1. LOGO ---
-        # !!! DİKKAT !!! logonuzun adını buraya yazın (logo.png veya logo.jpg)
+        # 1. LOGO (90x30mm)
         logo_path = "logo.png" 
-        LOGO_GENISLIK = 40 * mm # Logonuzun enini ayarlayın
-        LOGO_YUKSEKLIK = 25 * mm # Logonuzun boyunu ayarlayın
+        LOGO_GENISLIK = 90 * mm  # Test dosyanızdaki son boyut
+        LOGO_YUKSEKLIK = 30 * mm # Test dosyanızdaki son boyut
         
         try:
             logo = ImageReader(logo_path)
-            # Y konumu: Etiketin üstünden (y_base + yukseklik) başla, 5mm boşluk bırak, logoyu çiz
-            y_logo_start = y_base + yukseklik - 5*mm - LOGO_YUKSEKLIK
+            y_logo_start = y_base + yukseklik - 2*mm - LOGO_YUKSEKLIK
             x_logo_start = x_center - (LOGO_GENISLIK / 2)
             c.drawImage(logo, x_logo_start, y_logo_start, width=LOGO_GENISLIK, height=LOGO_YUKSEKLIK, mask='auto')
-            
-            # Bir sonraki metin için Y konumunu ayarla
-            y_next_line = y_logo_start - 6*mm # Logonun 6mm altı
+            y_next_line = y_logo_start - 5*mm # Test dosyanızdaki son ayar
         except:
-            y_next_line = y_base + yukseklik - 10*mm # En üstten 10mm aşağı
+            y_next_line = y_base + yukseklik - 10*mm
             c.setFont('Arial', 8)
             c.drawCentredString(x_center, y_next_line, "[LOGO YOK - logo.png ekleyin]")
             y_next_line -= 8*mm
 
-        # --- 2. BAHARAT ADI (Dinamik) ---
-        c.setFont('Arial-Bold', 14) # Kalın
+        # 2. BAHARAT ADI (12pt)
+        c.setFont('Arial-Bold', 12) 
         c.drawCentredString(x_center, y_next_line, baharat_adi)
-        y_next_line -= 8*mm # Adın 8mm altı
+        y_next_line -= 5*mm # Test dosyanızdaki son ayar
 
-        # --- 3. ALT BİLGİLER (Tarihler vs.) ---
-        c.setFont('Arial', 8) # Daha küçük font
-        
-        # 1. Satır: ÜRT.TARİHİ (Ortalı)
-        c.drawCentredString(x_center, y_next_line, f"ÜRT.TARİHİ: {uret_tarihi}")
-        y_next_line -= 4*mm # 4mm altı
-
-        # 2. Satır: Firma Bilgisi (Ortalı)
-        # !!! DİKKAT !!! Resimdeki gibi kendi bilgilerinizi buraya girin
-        c.drawCentredString(x_center, y_next_line, "LİDER BAHARAT yücel kaynak petroliş mh refah sk no 16")
+        # 3. ÜRETİM TARİHİ (9pt)
+        c.setFont('Arial', 9) 
+        c.drawCentredString(x_center, y_next_line, f"Ürt Tarihi : {uretim_tarihi_str}")
         y_next_line -= 4*mm
-        c.drawCentredString(x_center, y_next_line, "kartal İŞLETME NO TR-34-K-257496")
-        y_next_line -= 6*mm # Biraz daha boşluk
 
-        # 3. Satır: S.T.T ve PARTİ NO (İki Yana Yaslı)
-        # Sol ve sağ için hizalama noktaları
-        x_sol_nokta = x_base + 10*mm # Etiketin solundan 10mm içeride
-        x_sag_nokta = x_base + genislik - 10*mm # Etiketin sağından 10mm içeride
-        
-        c.drawString(x_sol_nokta, y_next_line, f"S.T.T {stt_tarihi}")
-        c.drawRightString(x_sag_nokta, y_next_line, f"PARTİ NO: {parti_no}")
+        # 4. PARTİ NO (8pt)
+        c.setFont('Arial', 8)
+        c.drawCentredString(x_center, y_next_line, "PARTİ NO:ÜRETİM TARİHİDİR")
+        y_next_line -= 4*mm
 
-    # --- ANA DÖNGÜ: Sayfaları ve Etiketleri Oluştur (Güncellendi) ---
+        # 5. İŞLETME NO (8pt)
+        c.setFont('Arial', 8) 
+        c.drawCentredString(x_center, y_next_line, "İŞLETME NO TR-34-K-257496")
+        y_next_line -= 4*mm
+
+        # 6. ADRES (6pt, Tek Satır)
+        c.setFont('Arial', 6) 
+        c.drawCentredString(x_center, y_next_line, "LİDER BAHARAT yücel Kaynak petroliş mh refah sk no 16 kartal")
+
+    # --- ANA DÖNGÜ ---
     for _ in range(page_count):
-        
-        # 2 Sütun (Sütun 0, Sütun 1)
         for col in range(2):
-            # Sütunun sol kenarını HESAPLA
             x = LEFT_MARGIN + col * (ETIKET_GENISLIK + HORIZONTAL_GUTTER)
-            
-            # 5 Satır (Satır 0, Satır 1, ..., Satır 4)
             for row in range(5):
-                # Y koordinatını HESAPLA (ReportLab alttan başlar)
                 y = (PAGE_H - TOP_MARGIN - ETIKET_YUKSEKLIK) - row * (ETIKET_YUKSEKLIK + VERTICAL_GUTTER)
-                
-                # Etiketi tam bu koordinatlara çiz
                 draw_single_label(x, y, ETIKET_GENISLIK, ETIKET_YUKSEKLIK, spice_name)
+        c.showPage()
         
-        c.showPage() # Yeni sayfaya geç
-        
-    # PDF dosyasını kaydet
     c.save()
-    print(f"'{pdf_file_name}' oluşturuldu.")
+    print(f"'{PDF_FILE_NAME}' oluşturuldu/güncellendi.")
 
-
-# --- 1. Baharat verisini yükle (Aynı kaldı) ---
+# --- 1. Baharat verisini yükle ---
 try:
     with open('baharatlar.json', 'r', encoding='utf-8') as f:
         baharat_listesi = json.load(f)
 except:
     baharat_listesi = [{"ad": "HATA: baharatlar.json dosyası bulunamadı"}]
 
-# --- 2. Ana web sayfasını sun (Aynı kaldı) ---
+# --- 2. Ana web sayfasını sun ---
 @app.route('/')
 def index():
     return render_template('index.html', baharatlar=baharat_listesi)
 
-# --- 3. Yazdırma isteğini karşıla (Aynı kaldı) ---
-@app.route('/print', methods=['POST'])
-def handle_print():
+# --- 3. PDF OLUŞTURMA Rotası (Önizleme için) ---
+@app.route('/generate', methods=['POST'])
+def handle_generate():
     try:
         data = request.json
         spice_name = data.get('spice')
         page_count = int(data.get('pages', 1))
+        date_str = data.get('date') # Dinamik tarihi al
 
         if not spice_name:
             return jsonify({"success": False, "message": "Baharat adı seçilmedi."}), 400
 
-        print(f"İstek alındı: {spice_name}, {page_count} sayfa")
-
-        # 4. Etiket PDF'ini oluştur
-        create_labels_pdf(spice_name, page_count)
+        # Gelen 'YYYY-MM-DD' tarihini 'DD.MM.YYYY' formatına çevir
+        if date_str:
+            try:
+                dt_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+                uret_tarihi_formatted = dt_obj.strftime("%d.%m.%Y")
+            except ValueError:
+                uret_tarihi_formatted = datetime.date.today().strftime("%d.%m.%Y")
+        else:
+            uret_tarihi_formatted = datetime.date.today().strftime("%d.%m.%Y")
         
-        # 5. Oluşturulan PDF'i YAZDIR
-        os.startfile("etiket.pdf", "print")
-
-        return jsonify({"success": True, "message": "Yazdırılıyor..."})
+        print(f"PDF İsteği: {spice_name}, {page_count} sayfa, Tarih: {uret_tarihi_formatted}")
+        
+        # Testteki hizalama ile PDF'i oluştur
+        create_labels_pdf(spice_name, page_count, uret_tarihi_formatted)
+        
+        return jsonify({
+            "success": True, 
+            "message": "PDF önizleme için hazır.",
+            "pdf_url": f"/download/{PDF_FILE_NAME}"
+        })
     
     except Exception as e:
         print(f"Hata oluştu: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# --- Sunucuyu Başlat (Aynı kaldı) ---
+# --- 4. PDF YAZDIRMA Rotası ---
+@app.route('/print-now', methods=['GET'])
+def handle_print_now():
+    try:
+        if not os.path.exists(PDF_FILE_NAME):
+            return jsonify({"success": False, "message": "Önce PDF oluşturulmalı."}), 404
+            
+        print(f"YAZDIRMA komutu: {PDF_FILE_NAME}")
+        # Windows'ta varsayılan yazıcıya gönder
+        os.startfile(PDF_FILE_NAME, "print")
+        return jsonify({"success": True, "message": "Yazıcıya gönderildi."})
+        
+    except Exception as e:
+        print(f"Yazdırma hatası: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# --- 5. PDF GÖRÜNTÜLEME Rotası ---
+@app.route('/download/<path:filename>')
+def download_file(filename):
+    return send_from_directory(directory='.', path=filename, as_attachment=False)
+
+# --- 6. PWA için Manifest ve Static Dosya Rotaları ---
+@app.route('/manifest.json')
+def serve_manifest():
+    return send_from_directory('static', 'manifest.json')
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('static', filename)
+
+# --- Sunucuyu Başlat ---
 if __name__ == '__main__':
-    print("Sunucu başlatılıyor... http://127.0.0.1:5000")
-    print("Telefondan erişim için bilgisayarınızın IP adresini kullanın.")
+    print("Sunucu başlatılıyor...")
+    print("Babanızın telefonundan erişim için:")
+    print("1. Bonjour'un (Apple Yazdırma Hizmetleri) kurulu olduğundan emin olun.")
+    print("2. Bilgisayarınızın adını öğrenin (örn: 'BABAMIN-PC').")
+    print("3. Adresi http://BABAMIN-PC.local:5000 olarak girin.")
     app.run(host='0.0.0.0', port=5000)

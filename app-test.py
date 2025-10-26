@@ -35,9 +35,9 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
     def draw_single_label(x_base, y_base, genislik, yukseklik, baharat_adi):
         x_center = x_base + genislik / 2
         
-        # 1. LOGO
+        # 1. LOGO (İSTEK: 45mm genişlik)
         logo_path = "logo.png" 
-        LOGO_GENISLIK = 35 * mm
+        LOGO_GENISLIK = 45 * mm  # 45mm olarak büyütüldü
         LOGO_YUKSEKLIK = 20 * mm 
         
         try:
@@ -45,7 +45,7 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
             y_logo_start = y_base + yukseklik - 2*mm - LOGO_YUKSEKLIK
             x_logo_start = x_center - (LOGO_GENISLIK / 2)
             c.drawImage(logo, x_logo_start, y_logo_start, width=LOGO_GENISLIK, height=LOGO_YUKSEKLIK, mask='auto')
-            y_next_line = y_logo_start - 6*mm 
+            y_next_line = y_logo_start - 5*mm # Boşluk azaltıldı
         except:
             y_next_line = y_base + yukseklik - 10*mm
             c.setFont('Arial', 8)
@@ -55,7 +55,7 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
         # 2. BAHARAT ADI (12pt)
         c.setFont('Arial-Bold', 12) 
         c.drawCentredString(x_center, y_next_line, baharat_adi)
-        y_next_line -= 6*mm 
+        y_next_line -= 5*mm # Boşluk azaltıldı (6'dan 5'e)
 
         # 3. ÜRETİM TARİHİ (9pt)
         c.setFont('Arial', 9) 
@@ -65,13 +65,17 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
         # 4. PARTİ NO (8pt)
         c.setFont('Arial', 8)
         c.drawCentredString(x_center, y_next_line, "PARTİ NO:ÜRETİM TARİHİDİR")
-        y_next_line -= 5*mm # Adres bloğundan önce 1mm ekstra boşluk
+        y_next_line -= 4*mm # Bir satır aşağı in
 
-        # 5. ADRES VE İŞLETME NO (İSTEK: Tek satır, 6pt)
-        c.setFont('Arial', 6) # Font 6pt olarak ayarlandı
-        combined_string = "LİDER BAHARAT yücel Kaynak petroliş mh refah sk no 16 kartal İŞLETME NO TR-34-K-257496"
-        c.drawCentredString(x_center, y_next_line, combined_string)
-        # Artık son satır olduğu için y_next_line'ı düşürmeye gerek yok
+        # 5. İŞLETME NO (İSTEK: Yeri değişti, 8pt)
+        c.setFont('Arial', 8) 
+        c.drawCentredString(x_center, y_next_line, "İŞLETME NO TR-34-K-257496")
+        y_next_line -= 4*mm # Bir satır aşağı in
+
+        # 6. ADRES (İSTEK: 6pt, Tek Satır)
+        c.setFont('Arial', 6) 
+        c.drawCentredString(x_center, y_next_line, "LİDER BAHARAT yücel Kaynak petroliş mh refah sk no 16 kartal")
+        # Bu son satır, altına boşluk gerekmiyor.
 
     # --- ANA DÖNGÜ ---
     for _ in range(page_count):

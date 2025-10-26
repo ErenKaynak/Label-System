@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Etiket Yazdır</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; }
+        select, input, button { width: 100%; padding: 15px; margin-bottom: 15px; font-size: 1.2em; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; }
+        #status { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>Lider Baharat Etiket Sistemi</h2>
+    
+    <label for="spice-select">Baharat Seçin:</label>
+    <select id="spice-select">
+        {% for baharat in baharatlar %}
+            <option value="{{ baharat.ad }}">{{ baharat.ad }}</option>
+        {% endfor %}
+    </select>
+    
+    <label for="page-count">Sayfa Sayısı:</label>
+    <input type="number" id="page-count" value="1" min="1">
+    
+    <button id="print-button">YAZDIR</button>
+    
+    <p id="status"></p>
+
+    <script>
+        document.getElementById('print-button').addEventListener('click', () => {
+            const spice = document.getElementById('spice-select').value;
+            const pages = document.getElementById('page-count').value;
+            const statusEl = document.getElementById('status');
+            
+            statusEl.textContent = 'İstek gönderiliyor...';
+            
+            fetch('/print', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ spice: spice, pages: pages })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    statusEl.textContent = `Başarılı: ${spice} (${pages} sayfa) yazdırılıyor!`;
+                } else {
+                    statusEl.textContent = `Hata: ${data.message}`;
+                }
+            })
+            .catch(err => {
+                statusEl.textContent = 'Hata: Sunucuya bağlanılamadı.';
+            });
+        });
+    </script>
+</body>
+</html>

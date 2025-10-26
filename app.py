@@ -68,13 +68,13 @@ def save_json_data(data):
 
 
 # --- PDF ETİKET OLUŞTURMA FONKSİYONU (GÜNCELLENDİ) ---
-# YENİ: Artık 'uretim_tarihi_str' parametresini alıyor
-def create_labels_pdf(cart_items, uretim_tarihi_str):
+# YENİ: Artık 'stt_tarihi_str' parametresini de alıyor
+def create_labels_pdf(cart_items, uretim_tarihi_str, stt_tarihi_str):
     PAGE_W, PAGE_H = A4
     c = canvas.Canvas(PDF_FILE_NAME, pagesize=A4)
     
     # --- TEK BİR ETİKETİ ÇİZEN FONKSİYON ---
-    # (app-test.py dosyanızdaki son hizalama)
+    # (app-test.py dosyanızdaki son hizalama + YENİ STT satırı)
     def draw_single_label(x_base, y_base, genislik, yukseklik, baharat_adi):
         x_center = x_base + genislik / 2
         
@@ -97,10 +97,16 @@ def create_labels_pdf(cart_items, uretim_tarihi_str):
         c.drawCentredString(x_center, y_next_line, baharat_adi)
         y_next_line -= 5*mm
 
-        # YENİ: 'uretim_tarihi_str' değişkeni artık burada mevcut
         c.setFont('Arial', 9) 
+        # 'uretim_tarihi_str' değişkeni üst fonksiyondan (scope) geliyor
         c.drawCentredString(x_center, y_next_line, f"Ürt Tarihi : {uretim_tarihi_str}")
-        y_next_line -= 4*mm
+        y_next_line -= 4*mm # Bir satır aşağı in
+
+        # YENİ: İsteğiniz üzerine STT eklendi (9pt)
+        c.setFont('Arial', 9) 
+        # 'stt_tarihi_str' değişkeni üst fonksiyondan (scope) geliyor
+        c.drawCentredString(x_center, y_next_line, f"STT : {stt_tarihi_str}")
+        y_next_line -= 4*mm # Bir satır aşağı in
 
         c.setFont('Arial', 8)
         c.drawCentredString(x_center, y_next_line, "PARTİ NO:ÜRETİM TARİHİDİR")
@@ -147,7 +153,7 @@ def handle_print_cart():
     try:
         data = request.json
         cart_data = data.get('cart')
-        date_str = data.get('date') # YENİ: Tarihi al
+        date_str = data.get('date') # Üretim Tarihini al
 
         if not cart_data:
             return jsonify({"success": False, "message": "Sepet boş."}), 400
@@ -155,16 +161,24 @@ def handle_print_cart():
             return jsonify({"success": False, "message": "Tarih seçilmedi."}), 400
 
         # YENİ: Gelen 'YYYY-MM-DD' tarihini 'DD.MM.YYYY' formatına çevir
+        # VE 2 YIL SONRASINI HESAPLA
         try:
+            # Üretim Tarihi
             dt_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
             uret_tarihi_formatted = dt_obj.strftime("%d.%m.%Y")
+            
+            # YENİ: STT Hesaplaması
+            stt_dt_obj = dt_obj.replace(year=dt_obj.year + 2)
+            stt_tarihi_formatted = stt_dt_obj.strftime("%d.%m.%Y")
+            
         except ValueError:
-            uret_tarihi_formatted = "TARIH HATASI" # Geçersiz tarih gelirse
+            uret_tarihi_formatted = "TARIH HATASI"
+            stt_tarihi_formatted = "TARIH HATASI"
 
-        print(f"Yazdırma İsteği Alındı: {len(cart_data)} kalem. Tarih: {uret_tarihi_formatted}")
+        print(f"Yazdırma İsteği Alındı: {len(cart_data)} kalem. ÜRT: {uret_tarihi_formatted} - STT: {stt_tarihi_formatted}")
         
-        # 1. Adım: PDF'i tarih bilgisiyle oluştur
-        create_labels_pdf(cart_data, uret_tarihi_formatted)
+        # 1. Adım: PDF'i her iki tarih bilgisiyle oluştur
+        create_labels_pdf(cart_data, uret_tarihi_formatted, stt_tarihi_formatted)
         
         # 2. Adım: PDF'i yazdır
         print(f"YAZDIRMA komutu: {PDF_FILE_NAME}")

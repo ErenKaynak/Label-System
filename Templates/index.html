@@ -39,7 +39,7 @@
         #print-all-button { background-color: #28a745; font-weight: bold; }
         #status { font-weight: bold; margin-top: 15px; }
 
-        /* YENİ: Listeyi Düzenle Bölümü Stilleri */
+        /* Yönetim Bölümü Stilleri */
         #admin-section {
             margin-top: 40px;
             border-top: 2px solid #ccc;
@@ -86,6 +86,12 @@
         <label for="page-count">Sayfa Sayısı:</label>
         <input type="number" id="page-count" value="1" min="1">
     </div>
+
+    <div class="form-group">
+        <label for="urt-tarihi">Üretim Tarihi (Tüm Sepet İçin):</label>
+        <input type="date" id="urt-tarihi">
+    </div>
+    
     <button id="add-to-cart-button">SEPETE EKLE</button>
     
     <div id="cart-section">
@@ -100,19 +106,16 @@
         <details>
             <summary>Listeyi Düzenle (Yeni Öğe Ekle)</summary>
             <div class="admin-forms">
-                
                 <div class="form-group">
                     <label for="new-spice">Yeni Baharat Adı:</label>
                     <input type="text" id="new-spice" placeholder="örn: ZERDEÇAL">
                     <button id="add-spice-btn">Yeni Baharat Ekle</button>
                 </div>
-                
                 <div class="form-group" style="margin-top: 20px;">
                     <label for="new-weight">Yeni Gramaj:</label>
                     <input type="text" id="new-weight" placeholder="örn: 750 GR">
                     <button id="add-weight-btn">Yeni Gramaj Ekle</button>
                 </div>
-
                 <p id="admin-status"></p>
             </div>
         </details>
@@ -123,6 +126,7 @@
         const spiceSelect = document.getElementById('spice-select');
         const weightSelect = document.getElementById('weight-select');
         const pageCountInput = document.getElementById('page-count');
+        const tarihInput = document.getElementById('urt-tarihi'); // YENİ
         const addToCartBtn = document.getElementById('add-to-cart-button');
         const cartItemsList = document.getElementById('cart-items');
         const printAllBtn = document.getElementById('print-all-button');
@@ -130,16 +134,24 @@
         
         let cart = []; // Sepet dizisi
 
-        // YÖNETİM Elemanları (Yeni)
+        // YÖNETİM Elemanları
         const newSpiceInput = document.getElementById('new-spice');
         const addSpiceBtn = document.getElementById('add-spice-btn');
         const newWeightInput = document.getElementById('new-weight');
         const addWeightBtn = document.getElementById('add-weight-btn');
         const adminStatusEl = document.getElementById('admin-status');
 
-        // ---- SEPET FONKSİYONLARI (Aynı) ----
+        // YENİ: Sayfa yüklendiğinde tarih alanını bugünün tarihi ile doldur
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            tarihInput.value = `${yyyy}-${mm}-${dd}`;
+        });
 
-        // Sepete Ekle Butonu
+        // ---- SEPET FONKSİYONLARI ----
+
         addToCartBtn.addEventListener('click', () => {
             const spice = spiceSelect.value;
             const weight = weightSelect.value;
@@ -149,14 +161,12 @@
                 statusEl.textContent = "Hata: Sayfa sayısı en az 1 olmalı.";
                 return;
             }
-            // 4 boşluk kuralı
             const labelName = spice + "    " + weight; 
             cart.push({ label: labelName, pages: pages });
             renderCart();
             statusEl.textContent = `Sepete eklendi: ${labelName} (${pages} sayfa)`;
         });
 
-        // Sepet Arayüzünü Çizen Fonksiyon
         function renderCart() {
             cartItemsList.innerHTML = '';
             if (cart.length === 0) {
@@ -174,7 +184,6 @@
             printAllBtn.style.display = 'block';
         }
 
-        // Sepetten Silme Butonu
         cartItemsList.addEventListener('click', (e) => {
             if (e.target.classList.contains('delete-btn')) {
                 const indexToRemove = parseInt(e.target.dataset.index);
@@ -184,18 +193,26 @@
             }
         });
 
-        // "TÜMÜNÜ YAZDIR" Butonu
+        // "TÜMÜNÜ YAZDIR" Butonu (GÜNCELLENDİ)
         printAllBtn.addEventListener('click', () => {
             if (cart.length === 0) {
                 statusEl.textContent = "Hata: Sepet boş.";
                 return;
             }
+            
+            const date = tarihInput.value; // YENİ: Tarihi al
+            if (!date) {
+                statusEl.textContent = "Hata: Lütfen geçerli bir üretim tarihi seçin.";
+                return;
+            }
+
             statusEl.textContent = 'Tüm sepet yazıcıya gönderiliyor...';
             
             fetch('/print-cart', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(cart)
+                // YENİ: Sepetle birlikte tarihi de gönder
+                body: JSON.stringify({ cart: cart, date: date }) 
             })
             .then(response => response.json())
             .then(data => {
@@ -212,11 +229,10 @@
             });
         });
 
-        // ---- YÖNETİM FONKSİYONLARI (Yeni) ----
+        // ---- YÖNETİM FONKSİYONLARI (Aynı) ----
 
-        // Yeni Baharat Ekle Butonu
         addSpiceBtn.addEventListener('click', () => {
-            const spiceName = newSpiceInput.value.trim().toUpperCase(); // Temizle ve BÜYÜK HARF yap
+            const spiceName = newSpiceInput.value.trim().toUpperCase();
             if (!spiceName) {
                 adminStatusEl.textContent = "Lütfen eklenecek baharat adını girin.";
                 return;
@@ -232,15 +248,13 @@
             .then(data => {
                 adminStatusEl.textContent = data.message;
                 if (data.success) {
-                    // Başarılı olursa, sayfayı yenile ki yeni listeler gelsin
                     setTimeout(() => location.reload(), 1000);
                 }
             });
         });
 
-        // Yeni Gramaj Ekle Butonu
         addWeightBtn.addEventListener('click', () => {
-            const weightName = newWeightInput.value.trim().toUpperCase(); // Temizle ve BÜYÜK HARF yap
+            const weightName = newWeightInput.value.trim().toUpperCase();
             if (!weightName) {
                 adminStatusEl.textContent = "Lütfen eklenecek gramajı girin.";
                 return;
@@ -256,7 +270,6 @@
             .then(data => {
                 adminStatusEl.textContent = data.message;
                 if (data.success) {
-                    // Başarılı olursa, sayfayı yenile ki yeni listeler gelsin
                     setTimeout(() => location.reload(), 1000);
                 }
             });

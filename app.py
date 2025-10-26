@@ -12,16 +12,27 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 # --- Flask Sunucusunu Başlat ---
-app = Flask(__name__)
+# ÇÖZÜM 2: 'Templates' (büyük harf) klasörünü belirt
+app = Flask(__name__, template_folder='Templates')
 
-# --- ÇIKARTMA KAĞIDI ÖLÇÜLERİ (Tanex şablonuyla aynı) ---
+
+# --- ÇÖZÜM 1: Dosyalar için mutlak (absolute) yol hesapla ---
+# Bu script'in bulunduğu dizinin tam yolunu al
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Dosyaların tam yollarını oluştur
+JSON_PATH = os.path.join(BASE_DIR, 'baharatlar.json')
+PDF_FILE_NAME = os.path.join(BASE_DIR, "etiket.pdf")
+LOGO_PATH = os.path.join(BASE_DIR, "logo.png")
+STATIC_PATH = os.path.join(BASE_DIR, "static")
+
+# --- ÇIKARTMA KAĞIDI ÖLÇÜLERİ ---
 TOP_MARGIN = 0.24 * 25.4 * mm
 LEFT_MARGIN = 0.18 * 25.4 * mm
 ETIKET_GENISLIK = 3.902 * 25.4 * mm
 ETIKET_YUKSEKLIK = 2.244 * 25.4 * mm
 HORIZONTAL_GUTTER = 0 * mm
 VERTICAL_GUTTER = 0 * mm
-PDF_FILE_NAME = "etiket.pdf" # Sabit dosya adı
 
 # --- Türkçe Fontları Kaydet ---
 try:
@@ -31,57 +42,48 @@ except:
     print("UYARI: Arial fontları bulunamadı.")
 
 # --- PDF ETİKET OLUŞTURMA FONKSİYONU ---
-# (Hizalama mantığı app-test.py'den kopyalandı)
 def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
     PAGE_W, PAGE_H = A4
     c = canvas.Canvas(PDF_FILE_NAME, pagesize=A4)
     
-    # --- TEK BİR ETİKETİ ÇİZEN FONKSİYON (app-test.py'deki son haliniz) ---
+    # --- Hizalama mantığı app-test.py'deki son haliniz ---
     def draw_single_label(x_base, y_base, genislik, yukseklik, baharat_adi):
         x_center = x_base + genislik / 2
         
-        # 1. LOGO (90x30mm)
-        logo_path = "logo.png" 
-        LOGO_GENISLIK = 90 * mm  # Test dosyanızdaki son boyut
-        LOGO_YUKSEKLIK = 30 * mm # Test dosyanızdaki son boyut
+        LOGO_GENISLIK = 90 * mm
+        LOGO_YUKSEKLIK = 30 * mm
         
         try:
-            logo = ImageReader(logo_path)
+            logo = ImageReader(LOGO_PATH) # Güncellenmiş yol
             y_logo_start = y_base + yukseklik - 2*mm - LOGO_YUKSEKLIK
             x_logo_start = x_center - (LOGO_GENISLIK / 2)
             c.drawImage(logo, x_logo_start, y_logo_start, width=LOGO_GENISLIK, height=LOGO_YUKSEKLIK, mask='auto')
-            y_next_line = y_logo_start - 5*mm # Test dosyanızdaki son ayar
+            y_next_line = y_logo_start - 5*mm
         except:
             y_next_line = y_base + yukseklik - 10*mm
             c.setFont('Arial', 8)
             c.drawCentredString(x_center, y_next_line, "[LOGO YOK - logo.png ekleyin]")
             y_next_line -= 8*mm
 
-        # 2. BAHARAT ADI (12pt)
         c.setFont('Arial-Bold', 12) 
         c.drawCentredString(x_center, y_next_line, baharat_adi)
-        y_next_line -= 5*mm # Test dosyanızdaki son ayar
+        y_next_line -= 5*mm
 
-        # 3. ÜRETİM TARİHİ (9pt)
         c.setFont('Arial', 9) 
         c.drawCentredString(x_center, y_next_line, f"Ürt Tarihi : {uretim_tarihi_str}")
         y_next_line -= 4*mm
 
-        # 4. PARTİ NO (8pt)
         c.setFont('Arial', 8)
         c.drawCentredString(x_center, y_next_line, "PARTİ NO:ÜRETİM TARİHİDİR")
         y_next_line -= 4*mm
 
-        # 5. İŞLETME NO (8pt)
         c.setFont('Arial', 8) 
         c.drawCentredString(x_center, y_next_line, "İŞLETME NO TR-34-K-257496")
         y_next_line -= 4*mm
 
-        # 6. ADRES (6pt, Tek Satır)
         c.setFont('Arial', 6) 
         c.drawCentredString(x_center, y_next_line, "LİDER BAHARAT yücel Kaynak petroliş mh refah sk no 16 kartal")
 
-    # --- ANA DÖNGÜ ---
     for _ in range(page_count):
         for col in range(2):
             x = LEFT_MARGIN + col * (ETIKET_GENISLIK + HORIZONTAL_GUTTER)
@@ -93,31 +95,38 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
     c.save()
     print(f"'{PDF_FILE_NAME}' oluşturuldu/güncellendi.")
 
-# --- 1. Baharat verisini yükle ---
+# --- 1. Baharat verisini yükle (Gelişmiş Hata Ayıklama ile) ---
 try:
-    with open('baharatlar.json', 'r', encoding='utf-8') as f:
+    with open(JSON_PATH, 'r', encoding='utf-8') as f:
         baharat_listesi = json.load(f)
-except:
-    baharat_listesi = [{"ad": "HATA: baharatlar.json dosyası bulunamadı"}]
+    print(f"Başarılı: '{JSON_PATH}' yüklendi.")
+except Exception as e:
+    # ÇÖZÜM 1: Kullanıcıya gerçek hatayı göster
+    print("---------------------------------------------------------")
+    print(f"!!! KRİTİK HATA: 'baharatlar.json' dosyası okunamadı. !!!")
+    print(f"Aranan dosya yolu: {JSON_PATH}")
+    print(f"Hata detayı: {e}")
+    print("Lütfen kontrol edin: Dosya var mı? Formatı (JSON) bozuk mu? Kodlaması UTF-8 mi?")
+    print("---------------------------------------------------------")
+    baharat_listesi = [{"ad": f"HATA: baharatlar.json yüklenemedi. Detay: {e}"}]
 
 # --- 2. Ana web sayfasını sun ---
 @app.route('/')
 def index():
     return render_template('index.html', baharatlar=baharat_listesi)
 
-# --- 3. PDF OLUŞTURMA Rotası (Önizleme için) ---
+# --- 3. PDF OLUŞTURMA Rotası ---
 @app.route('/generate', methods=['POST'])
 def handle_generate():
     try:
         data = request.json
         spice_name = data.get('spice')
         page_count = int(data.get('pages', 1))
-        date_str = data.get('date') # Dinamik tarihi al
+        date_str = data.get('date')
 
         if not spice_name:
             return jsonify({"success": False, "message": "Baharat adı seçilmedi."}), 400
 
-        # Gelen 'YYYY-MM-DD' tarihini 'DD.MM.YYYY' formatına çevir
         if date_str:
             try:
                 dt_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -129,13 +138,12 @@ def handle_generate():
         
         print(f"PDF İsteği: {spice_name}, {page_count} sayfa, Tarih: {uret_tarihi_formatted}")
         
-        # Testteki hizalama ile PDF'i oluştur
         create_labels_pdf(spice_name, page_count, uret_tarihi_formatted)
         
         return jsonify({
             "success": True, 
             "message": "PDF önizleme için hazır.",
-            "pdf_url": f"/download/{PDF_FILE_NAME}"
+            "pdf_url": f"/download/etiket.pdf" # İsim sabit
         })
     
     except Exception as e:
@@ -150,7 +158,6 @@ def handle_print_now():
             return jsonify({"success": False, "message": "Önce PDF oluşturulmalı."}), 404
             
         print(f"YAZDIRMA komutu: {PDF_FILE_NAME}")
-        # Windows'ta varsayılan yazıcıya gönder
         os.startfile(PDF_FILE_NAME, "print")
         return jsonify({"success": True, "message": "Yazıcıya gönderildi."})
         
@@ -161,16 +168,18 @@ def handle_print_now():
 # --- 5. PDF GÖRÜNTÜLEME Rotası ---
 @app.route('/download/<path:filename>')
 def download_file(filename):
-    return send_from_directory(directory='.', path=filename, as_attachment=False)
+    # PDF'in bulunduğu ana dizinden dosyayı sun
+    return send_from_directory(directory=BASE_DIR, path=filename, as_attachment=False)
 
 # --- 6. PWA için Manifest ve Static Dosya Rotaları ---
 @app.route('/manifest.json')
 def serve_manifest():
-    return send_from_directory('static', 'manifest.json')
+    return send_from_directory(STATIC_PATH, 'manifest.json')
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    return send_from_directory('static', filename)
+    # 'static/icons/icon.png' gibi istekleri doğru klasörden sunar
+    return send_from_directory(STATIC_PATH, filename)
 
 # --- Sunucuyu Başlat ---
 if __name__ == '__main__':

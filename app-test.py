@@ -37,8 +37,8 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
         
         # 1. LOGO (İSTEK: 45mm genişlik)
         logo_path = "logo.png" 
-        LOGO_GENISLIK = 45 * mm  # 45mm olarak büyütüldü
-        LOGO_YUKSEKLIK = 20 * mm 
+        LOGO_GENISLIK = 90 * mm  # 90mm olarak büyütüldü
+        LOGO_YUKSEKLIK = 30 * mm 
         
         try:
             logo = ImageReader(logo_path)

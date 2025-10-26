@@ -37,7 +37,7 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
         
         # 1. LOGO
         logo_path = "logo.png" 
-        LOGO_GENISLIK = 40 * mm 
+        LOGO_GENISLIK = 35 * mm  # İSTEK 2: Logo küçültüldü (40'tan 35'e)
         LOGO_YUKSEKLIK = 20 * mm 
         
         try:
@@ -62,21 +62,21 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
         c.drawCentredString(x_center, y_next_line, f"Ürt Tarihi : {uretim_tarihi_str}")
         y_next_line -= 4*mm
 
-        # 4. PARTİ NO (İsteğiniz: Yeni Eklendi, 8pt)
+        # 4. PARTİ NO (8pt)
         c.setFont('Arial', 8)
         c.drawCentredString(x_center, y_next_line, "PARTİ NO:ÜRETİM TARİHİDİR")
-        y_next_line -= 4*mm
+        y_next_line -= 5*mm # Adres bloğundan önce 1mm ekstra boşluk
 
-        # 5. ADRES (İsteğiniz: 8pt, 2 satır)
-        c.setFont('Arial', 8) 
-        c.drawCentredString(x_center, y_next_line, "LİDER BAHARAT yücel Kaynak") # 1. Satır
-        y_next_line -= 4*mm # Bir satır aşağı in
-        c.drawCentredString(x_center, y_next_line, "petroliş mh refah sk no 16 kartal") # 2. Satır
-        y_next_line -= 4*mm
-
-        # 6. İŞLETME NO (İsteğiniz: 8pt)
+        # 5. İŞLETME NO (İSTEK 1: Yeri değişti)
         c.setFont('Arial', 8) 
         c.drawCentredString(x_center, y_next_line, "İŞLETME NO TR-34-K-257496")
+        y_next_line -= 4*mm # Bir satır aşağı in
+
+        # 6. ADRES (8pt, 2 satır)
+        c.setFont('Arial', 8) 
+        c.drawCentredString(x_center, y_next_line, "LİDER BAHARAT yücel Kaynak") 
+        y_next_line -= 4*mm 
+        c.drawCentredString(x_center, y_next_line, "petroliş mh refah sk no 16 kartal")
 
     # --- ANA DÖNGÜ ---
     for _ in range(page_count):
@@ -94,17 +94,14 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
 if __name__ == '__main__':
     print("Test PDF oluşturucu başlatıldı...")
     
-    # --- TEST İÇİN BU DEĞERLERİ DEĞİŞTİRİN ---
     TEST_BAHARAT_ADI = "TEST ÜRÜNÜ (12 PUNTO)"
     TEST_SAYFA_SAYISI = 1
     TEST_URETIM_TARIHI = "25.10.2025"
     
     try:
         create_labels_pdf(TEST_BAHARAT_ADI, TEST_SAYFA_SAYISI, TEST_URETIM_TARIHI)
-        
         print(f"Başarılı! '{PDF_TEST_FILE_NAME}' dosyası bu klasörde oluşturuldu.")
         
-        # PDF'i otomatik olarak aç
         print("Test PDF dosyası açılıyor...")
         try:
             os.startfile(PDF_TEST_FILE_NAME)

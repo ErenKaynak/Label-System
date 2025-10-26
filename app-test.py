@@ -37,7 +37,7 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
         
         # 1. LOGO
         logo_path = "logo.png" 
-        LOGO_GENISLIK = 35 * mm  # İSTEK 2: Logo küçültüldü (40'tan 35'e)
+        LOGO_GENISLIK = 35 * mm
         LOGO_YUKSEKLIK = 20 * mm 
         
         try:
@@ -67,16 +67,11 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
         c.drawCentredString(x_center, y_next_line, "PARTİ NO:ÜRETİM TARİHİDİR")
         y_next_line -= 5*mm # Adres bloğundan önce 1mm ekstra boşluk
 
-        # 5. İŞLETME NO (İSTEK 1: Yeri değişti)
-        c.setFont('Arial', 8) 
-        c.drawCentredString(x_center, y_next_line, "İŞLETME NO TR-34-K-257496")
-        y_next_line -= 4*mm # Bir satır aşağı in
-
-        # 6. ADRES (8pt, 2 satır)
-        c.setFont('Arial', 8) 
-        c.drawCentredString(x_center, y_next_line, "LİDER BAHARAT yücel Kaynak") 
-        y_next_line -= 4*mm 
-        c.drawCentredString(x_center, y_next_line, "petroliş mh refah sk no 16 kartal")
+        # 5. ADRES VE İŞLETME NO (İSTEK: Tek satır, 6pt)
+        c.setFont('Arial', 6) # Font 6pt olarak ayarlandı
+        combined_string = "LİDER BAHARAT yücel Kaynak petroliş mh refah sk no 16 kartal İŞLETME NO TR-34-K-257496"
+        c.drawCentredString(x_center, y_next_line, combined_string)
+        # Artık son satır olduğu için y_next_line'ı düşürmeye gerek yok
 
     # --- ANA DÖNGÜ ---
     for _ in range(page_count):

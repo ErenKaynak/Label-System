@@ -64,7 +64,7 @@
     </style>
 </head>
 <body>
-    <h2>Lider Baharat Etiket Sistemi</h2>
+    <h2>Etiket Sistemi</h2>
     
     <div class="form-group">
         <label for="spice-select">Baharat Seçin:</label>
@@ -88,9 +88,8 @@
     </div>
 
     <div class="form-group">
-        <label for="urt-tarihi">Üretim Tarihi (Tüm Sepet İçin):</label>
-        <input type="date" id="urt-tarihi">
-    </div>
+        <label for="stt-tarihi">Son Tüketim Tarihi (Tüm Sepet İçin):</label>
+        <input type="month" id="stt-tarihi"> </div>
     
     <button id="add-to-cart-button">SEPETE EKLE</button>
     
@@ -126,7 +125,7 @@
         const spiceSelect = document.getElementById('spice-select');
         const weightSelect = document.getElementById('weight-select');
         const pageCountInput = document.getElementById('page-count');
-        const tarihInput = document.getElementById('urt-tarihi'); // YENİ
+        const tarihInput = document.getElementById('stt-tarihi'); // GÜNCELLENDİ: 'urt-tarihi' -> 'stt-tarihi'
         const addToCartBtn = document.getElementById('add-to-cart-button');
         const cartItemsList = document.getElementById('cart-items');
         const printAllBtn = document.getElementById('print-all-button');
@@ -141,13 +140,15 @@
         const addWeightBtn = document.getElementById('add-weight-btn');
         const adminStatusEl = document.getElementById('admin-status');
 
-        // YENİ: Sayfa yüklendiğinde tarih alanını bugünün tarihi ile doldur
+        // GÜNCELLENDİ: Sayfa yüklendiğinde tarih alanını mevcut Ay/Yıl ile doldur
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
+            // Varsayılan STT'yi 2 yıl sonrası olarak ayarla
+            today.setFullYear(today.getFullYear() + 2); 
+            
             const yyyy = today.getFullYear();
             const mm = String(today.getMonth() + 1).padStart(2, '0');
-            const dd = String(today.getDate()).padStart(2, '0');
-            tarihInput.value = `${yyyy}-${mm}-${dd}`;
+            tarihInput.value = `${yyyy}-${mm}`; // Format: "YYYY-MM"
         });
 
         // ---- SEPET FONKSİYONLARI ----
@@ -200,9 +201,9 @@
                 return;
             }
             
-            const date = tarihInput.value; // YENİ: Tarihi al
+            const date = tarihInput.value; // GÜNCELLENDİ: STT (YYYY-MM) bilgisini al
             if (!date) {
-                statusEl.textContent = "Hata: Lütfen geçerli bir üretim tarihi seçin.";
+                statusEl.textContent = "Hata: Lütfen geçerli bir STT seçin.";
                 return;
             }
 
@@ -211,7 +212,7 @@
             fetch('/print-cart', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // YENİ: Sepetle birlikte tarihi de gönder
+                // GÜNCELLENDİ: Sepetle birlikte tarihi de gönder
                 body: JSON.stringify({ cart: cart, date: date }) 
             })
             .then(response => response.json())

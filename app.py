@@ -6,7 +6,7 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 
 # --- PDF Oluşturma Kütüphaneleri ---
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4 # A4 boyutlarını almak için
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
@@ -24,13 +24,18 @@ STATIC_PATH = os.path.join(BASE_DIR, "static")
 
 json_lock = threading.Lock()
 
-# --- ÇIKARTMA KAĞIDI ÖLÇÜLERİ ---
-TOP_MARGIN = 0.24 * 25.4 * mm
-LEFT_MARGIN = 0.18 * 25.4 * mm
-ETIKET_GENISLIK = 3.902 * 25.4 * mm
-ETIKET_YUKSEKLIK = 2.244 * 25.4 * mm
+# --- ÇIKARTMA KAĞIDI ÖLÇÜLERİ (GÜNCELLENDİ) ---
+# İSTEK 7: Marjları 0'a 0 yap
+PAGE_W, PAGE_H = A4 # A4 boyutlarını (genişlik, yükseklik) al
+TOP_MARGIN = 0 * mm
+LEFT_MARGIN = 0 * mm
 HORIZONTAL_GUTTER = 0 * mm
 VERTICAL_GUTTER = 0 * mm
+
+# 10 eşit parçaya böl
+ETIKET_GENISLIK = PAGE_W / 2  # A4 Genişliği / 2
+ETIKET_YUKSEKLIK = PAGE_H / 5 # A4 Yüksekliği / 5
+
 
 # --- Türkçe Fontları Kaydet ---
 try:
@@ -68,14 +73,14 @@ def save_json_data(data):
 
 
 # --- PDF ETİKET OLUŞTURMA FONKSİYONU (GÜNCELLENDİ) ---
-# YENİ: Artık 'stt_tarihi_str' parametresini de alıyor
-def create_labels_pdf(cart_items, uretim_tarihi_str, stt_tarihi_str):
-    PAGE_W, PAGE_H = A4
+# YENİ: Artık 'stt_tarihi_str' (MM / YYYY) alıyor
+def create_labels_pdf(cart_items, stt_tarihi_str):
     c = canvas.Canvas(PDF_FILE_NAME, pagesize=A4)
     
     # --- TEK BİR ETİKETİ ÇİZEN FONKSİYON ---
-    # (app-test.py dosyanızdaki son hizalama + YENİ STT satırı)
+    # (Tüm isteklerinize göre güncellendi)
     def draw_single_label(x_base, y_base, genislik, yukseklik, baharat_adi):
+        # x_center artık etiketin tam ortası (marj 0 olduğu için)
         x_center = x_base + genislik / 2
         
         LOGO_GENISLIK = 90 * mm
@@ -83,8 +88,10 @@ def create_labels_pdf(cart_items, uretim_tarihi_str, stt_tarihi_str):
         
         try:
             logo = ImageReader(LOGO_PATH)
+            # Y konumu: Etiketin üstünden 2mm boşluk bırak
             y_logo_start = y_base + yukseklik - 2*mm - LOGO_YUKSEKLIK
-            x_logo_start = x_center - (LOGO_GENISLIK / 2)
+            # İSTEK 1: x_center kullanarak ortala
+            x_logo_start = x_center - (LOGO_GENISLIK / 2) 
             c.drawImage(logo, x_logo_start, y_logo_start, width=LOGO_GENISLIK, height=LOGO_YUKSEKLIK, mask='auto')
             y_next_line = y_logo_start - 5*mm
         except:
@@ -93,31 +100,31 @@ def create_labels_pdf(cart_items, uretim_tarihi_str, stt_tarihi_str):
             c.drawCentredString(x_center, y_next_line, "[LOGO YOK - logo.png ekleyin]")
             y_next_line -= 8*mm
 
+        # Baharat Adı (12pt)
         c.setFont('Arial-Bold', 12) 
         c.drawCentredString(x_center, y_next_line, baharat_adi)
         y_next_line -= 5*mm
 
-        c.setFont('Arial', 9) 
-        # 'uretim_tarihi_str' değişkeni üst fonksiyondan (scope) geliyor
-        c.drawCentredString(x_center, y_next_line, f"Ürt Tarihi : {uretim_tarihi_str}")
-        y_next_line -= 4*mm # Bir satır aşağı in
+        # İSTEK 2: Üretim Tarihi SİLİNDİ
 
-        # YENİ: İsteğiniz üzerine STT eklendi (9pt)
+        # İSTEK 3 & 4: STT Eklendi (Ay/Yıl) (9pt)
         c.setFont('Arial', 9) 
-        # 'stt_tarihi_str' değişkeni üst fonksiyondan (scope) geliyor
         c.drawCentredString(x_center, y_next_line, f"STT : {stt_tarihi_str}")
-        y_next_line -= 4*mm # Bir satır aşağı in
-
-        c.setFont('Arial', 8)
-        c.drawCentredString(x_center, y_next_line, "PARTİ NO:ÜRETİM TARİHİDİR")
         y_next_line -= 4*mm
 
+        # İSTEK 5: Parti No metni güncellendi (8pt)
+        c.setFont('Arial', 8)
+        c.drawCentredString(x_center, y_next_line, "PARTİ NO:SON TÜKETİM TARİHİDİR")
+        y_next_line -= 4*mm
+
+        # İşletme No (8pt)
         c.setFont('Arial', 8) 
         c.drawCentredString(x_center, y_next_line, "İŞLETME NO TR-34-K-257496")
         y_next_line -= 4*mm
 
-        c.setFont('Arial', 6) 
-        c.drawCentredString(x_center, y_next_line, "LİDER BAHARAT yücel Kaynak petroliş mh refah sk no 16 kartal")
+        # İSTEK 6: Adres güncellendi (8pt, "LİDER BAHARAT" silindi)
+        c.setFont('Arial', 8) # 6pt -> 8pt
+        c.drawCentredString(x_center, y_next_line, "yücel Kaynak petroliş mh refah sk no 16 kartal")
 
     # --- ANA DÖNGÜ (Sepet Mantığı) ---
     for item in cart_items:
@@ -127,10 +134,11 @@ def create_labels_pdf(cart_items, uretim_tarihi_str, stt_tarihi_str):
         for _ in range(page_count):
             for row in range(5):
                 for col in range(2):
-                    x = LEFT_MARGIN + col * (ETIKET_GENISLIK + HORIZONTAL_GUTTER)
-                    y = (PAGE_H - TOP_MARGIN - ETIKET_YUKSEKLIK) - row * (ETIKET_YUKSEKLIK + VERTICAL_GUTTER)
+                    # İSTEK 7: Marjlar 0 olduğu için hesaplama basitleşti
+                    x = LEFT_MARGIN + col * ETIKET_GENISLIK
+                    # ReportLab Y ekseni alttan başlar (0)
+                    y = (PAGE_H - TOP_MARGIN - ETIKET_YUKSEKLIK) - row * ETIKET_YUKSEKLIK
                     
-                    # Etiketi çiz
                     draw_single_label(x, y, ETIKET_GENISLIK, ETIKET_YUKSEKLIK, label_name)
             
             c.showPage()
@@ -153,32 +161,25 @@ def handle_print_cart():
     try:
         data = request.json
         cart_data = data.get('cart')
-        date_str = data.get('date') # Üretim Tarihini al
+        date_str = data.get('date') # GÜNCELLENDİ: STT (YYYY-MM) al
 
         if not cart_data:
             return jsonify({"success": False, "message": "Sepet boş."}), 400
         if not date_str:
-            return jsonify({"success": False, "message": "Tarih seçilmedi."}), 400
+            return jsonify({"success": False, "message": "STT seçilmedi."}), 400
 
-        # YENİ: Gelen 'YYYY-MM-DD' tarihini 'DD.MM.YYYY' formatına çevir
-        # VE 2 YIL SONRASINI HESAPLA
+        # GÜNCELLENDİ: Gelen 'YYYY-MM' tarihini 'MM / YYYY' formatına çevir
         try:
-            # Üretim Tarihi
-            dt_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-            uret_tarihi_formatted = dt_obj.strftime("%d.%m.%Y")
-            
-            # YENİ: STT Hesaplaması
-            stt_dt_obj = dt_obj.replace(year=dt_obj.year + 2)
-            stt_tarihi_formatted = stt_dt_obj.strftime("%d.%m.%Y")
+            dt_obj = datetime.datetime.strptime(date_str, '%Y-%m')
+            stt_tarihi_formatted = dt_obj.strftime("%m / %Y") # Format: "10 / 2025"
             
         except ValueError:
-            uret_tarihi_formatted = "TARIH HATASI"
             stt_tarihi_formatted = "TARIH HATASI"
 
-        print(f"Yazdırma İsteği Alındı: {len(cart_data)} kalem. ÜRT: {uret_tarihi_formatted} - STT: {stt_tarihi_formatted}")
+        print(f"Yazdırma İsteği Alındı: {len(cart_data)} kalem. STT: {stt_tarihi_formatted}")
         
-        # 1. Adım: PDF'i her iki tarih bilgisiyle oluştur
-        create_labels_pdf(cart_data, uret_tarihi_formatted, stt_tarihi_formatted)
+        # 1. Adım: PDF'i STT bilgisiyle oluştur
+        create_labels_pdf(cart_data, stt_tarihi_formatted)
         
         # 2. Adım: PDF'i yazdır
         print(f"YAZDIRMA komutu: {PDF_FILE_NAME}")

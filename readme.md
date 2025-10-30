@@ -26,20 +26,20 @@
 
 ```
 ┌─────────────────────────────────────┐
-│  🏷️  Etiket Sistemi                │
+│   🏷️  Etiket Sistemi                │
 │─────────────────────────────────────│
-│  Baharat Seçin: [TOZ BİBER    ▼]   │
-│  Gramaj Seçin:  [1 KG         ▼]   │
-│  Sayfa Sayısı:  [1            ]    │
-│  STT:           [10/2027      ]    │
+│   Baharat Seçin: [TOZ BİBER    ▼]   │
+│   Gramaj Seçin:  [1 KG         ▼]   │
+│   Sayfa Sayısı:  [1            ]    │
+│   STT:           [10/2027      ]    │
 │                                     │
-│  [      SEPETE EKLE      ]         │
+│   [      SEPETE EKLE      ]         │
 │─────────────────────────────────────│
-│  📋 Yazdırma Sepeti                │
-│  • TOZ BİBER 1KG (2 sayfa)   [Sil] │
-│  • KİMYON 500GR (1 sayfa)    [Sil] │
+│   📋 Yazdırma Sepeti                │
+│   • TOZ BİBER 1KG (2 sayfa)   [Sil] │
+│   • KİMYON 500GR (1 sayfa)    [Sil] │
 │                                     │
-│  [    TÜMÜNÜ YAZDIR    ]          │
+│    [    TÜMÜNÜ YAZDIR    ]          │
 └─────────────────────────────────────┘
 ```
 
@@ -428,16 +428,6 @@ Katkılarınızı bekliyoruz! İşte nasıl katkıda bulunabilirsiniz:
 - [ ] 🚧 Barkod entegrasyonu
 - [ ] 🚧 Excel import/export
 - [ ] 🚧 Kullanıcı giriş sistemi
-
----
-
-## 📄 Lisans
-
-Bu proje **MIT Lisansı** altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
-
-```
-MIT License - Serbestçe kullanabilir, değiştirebilir ve dağıtabilirsiniz.
-```
 
 ---
 

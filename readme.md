@@ -196,7 +196,7 @@ http://[BİLGİSAYAR-ADI].local:5000
 </tr>
 <tr>
 <td>🏢 İşletme No</td>
-<td>TR-34-K-257496</td>
+<td>TR-XX-X-XXXXXX</td>
 <td>Arial 8pt</td>
 </tr>
 <tr>

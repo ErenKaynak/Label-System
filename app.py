@@ -3,6 +3,7 @@ import json
 import datetime
 import threading 
 from flask import Flask, render_template, request, jsonify, send_from_directory
+from werkzeug.utils import secure_filename
 
 # --- PDF Oluşturma Kütüphaneleri ---
 from reportlab.pdfgen import canvas
@@ -21,8 +22,19 @@ JSON_PATH = os.path.join(BASE_DIR, 'baharatlar.json')
 PDF_FILE_NAME = os.path.join(BASE_DIR, "etiket.pdf")
 LOGO_PATH = os.path.join(BASE_DIR, "logo.png")
 STATIC_PATH = os.path.join(BASE_DIR, "static")
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+PRINT_QUEUE_PATH = os.path.join(BASE_DIR, 'print_queue.json')
+
+# --- Dosya Yükleme Ayarları ---
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Flask ayarları
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
 json_lock = threading.Lock()
+queue_lock = threading.Lock()
 
 # --- ÇIKARTMA KAĞIDI ÖLÇÜLERİ (GÜNCELLENDİ) ---
 # İSTEK 7: Marjları 0'a 0 yap
@@ -70,6 +82,59 @@ def save_json_data(data):
             print("Başarılı: baharatlar.json dosyası güncellendi.")
         except Exception as e:
             print(f"!!! KRİTİK HATA: JSON yazma hatası: {e}")
+
+
+# --- DOSYA YÜKLEME YARDIMCI FONKSİYONLARI ---
+
+def allowed_file(filename):
+    """Dosya uzantısının izin verilen türlerden olup olmadığını kontrol eder."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def load_print_queue():
+    """Print queue JSON dosyasını yükler."""
+    with queue_lock:
+        if not os.path.exists(PRINT_QUEUE_PATH):
+            return {"queue": []}
+        
+        try:
+            with open(PRINT_QUEUE_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Print queue okuma hatası: {e}")
+            return {"queue": []}
+
+
+def save_print_queue(queue_data):
+    """Print queue'yu JSON dosyasına kaydeder."""
+    with queue_lock:
+        try:
+            with open(PRINT_QUEUE_PATH, 'w', encoding='utf-8') as f:
+                json.dump(queue_data, f, ensure_ascii=False, indent=2)
+            print("Print queue güncellendi.")
+        except Exception as e:
+            print(f"Print queue yazma hatası: {e}")
+
+
+def add_to_print_queue(filename, original_filename):
+    """Dosyayı print queue'ya ekler."""
+    queue_data = load_print_queue()
+    
+    # Generate unique ID by finding the maximum ID and adding 1
+    max_id = 0
+    if queue_data["queue"]:
+        max_id = max(item["id"] for item in queue_data["queue"])
+    
+    queue_item = {
+        "id": max_id + 1,
+        "filename": filename,
+        "original_filename": original_filename,
+        "timestamp": datetime.datetime.now().isoformat(),
+        "status": "pending"
+    }
+    queue_data["queue"].append(queue_item)
+    save_print_queue(queue_data)
+    return queue_item
 
 
 # --- PDF ETİKET OLUŞTURMA FONKSİYONU (GÜNCELLENDİ) ---
@@ -154,6 +219,182 @@ def index():
     baharat_listesi = data.get("baharatlar", [])
     gramaj_listesi = data.get("gramajlar", [])
     return render_template('index.html', baharat_listesi=baharat_listesi, gramaj_listesi=gramaj_listesi)
+
+
+# --- DOSYA YÜKLEME VE YAZDIRMA KUYRUĞU ROTALARı ---
+
+@app.route('/upload-file', methods=['POST'])
+def upload_file():
+    """Dosya yükleme endpoint'i."""
+    try:
+        # Dosya kontrolü
+        if 'file' not in request.files:
+            return jsonify({"success": False, "message": "Dosya seçilmedi."}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({"success": False, "message": "Dosya seçilmedi."}), 400
+        
+        # Dosya tipi kontrolü
+        if not allowed_file(file.filename):
+            return jsonify({
+                "success": False, 
+                "message": "Geçersiz dosya tipi. Sadece PDF, PNG, JPG dosyaları yükleyebilirsiniz."
+            }), 400
+        
+        # Dosyayı kaydet
+        filename = secure_filename(file.filename)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_filename = f"{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        
+        # Uploads klasörünü oluştur (yoksa)
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        
+        file.save(filepath)
+        
+        # Print queue'ya ekle
+        queue_item = add_to_print_queue(unique_filename, filename)
+        
+        return jsonify({
+            "success": True, 
+            "message": f"'{filename}' başarıyla yüklendi ve yazdırma kuyruğuna eklendi.",
+            "queue_item": queue_item
+        })
+        
+    except Exception as e:
+        print(f"Dosya yükleme hatası: {e}")
+        return jsonify({"success": False, "message": f"Dosya yükleme hatası: {str(e)}"}), 500
+
+
+@app.route('/get-print-queue', methods=['GET'])
+def get_print_queue():
+    """Print queue'yu döndürür."""
+    try:
+        queue_data = load_print_queue()
+        return jsonify({"success": True, "queue": queue_data["queue"]})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route('/remove-from-queue/<int:item_id>', methods=['DELETE'])
+def remove_from_queue(item_id):
+    """Print queue'dan bir öğe siler."""
+    try:
+        queue_data = load_print_queue()
+        queue = queue_data["queue"]
+        
+        # ID'ye göre öğeyi bul
+        item_to_remove = next((item for item in queue if item["id"] == item_id), None)
+        
+        if item_to_remove is None:
+            return jsonify({"success": False, "message": "Öğe bulunamadı."}), 404
+        
+        # Öğeyi listeden çıkar
+        queue.remove(item_to_remove)
+        
+        # Dosyayı sil
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], item_to_remove["filename"])
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        
+        save_print_queue(queue_data)
+        
+        return jsonify({"success": True, "message": "Öğe kuyruktan silindi."})
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route('/print-queue-item/<int:item_id>', methods=['POST'])
+def print_queue_item(item_id):
+    """Kuyruktaki bir öğeyi yazdırır."""
+    try:
+        queue_data = load_print_queue()
+        queue = queue_data["queue"]
+        
+        # ID'ye göre öğeyi bul
+        item_to_print = next((item for item in queue if item["id"] == item_id), None)
+        
+        if item_to_print is None:
+            return jsonify({"success": False, "message": "Öğe bulunamadı."}), 404
+        
+        # Dosyayı yazdır
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], item_to_print["filename"])
+        
+        if not os.path.exists(filepath):
+            return jsonify({"success": False, "message": "Dosya bulunamadı."}), 404
+        
+        # Durumu güncelle
+        item_to_print["status"] = "printing"
+        save_print_queue(queue_data)
+        
+        # Dosyayı yazdır
+        try:
+            print(f"Yazdırma komutu: {filepath}")
+            os.startfile(filepath, "print")
+            
+            # Durumu tamamlandı olarak işaretle
+            item_to_print["status"] = "completed"
+            item_to_print["printed_at"] = datetime.datetime.now().isoformat()
+            save_print_queue(queue_data)
+            
+            return jsonify({
+                "success": True, 
+                "message": f"'{item_to_print['original_filename']}' yazıcıya gönderildi."
+            })
+        except Exception as print_error:
+            # Yazdırma hatası durumunda durumu geri al
+            item_to_print["status"] = "pending"
+            save_print_queue(queue_data)
+            raise print_error
+        
+    except Exception as e:
+        print(f"Yazdırma hatası: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route('/print-all-queue', methods=['POST'])
+def print_all_queue():
+    """Kuyruktaki tüm bekleyen öğeleri yazdırır."""
+    try:
+        queue_data = load_print_queue()
+        queue = queue_data["queue"]
+        
+        printed_count = 0
+        failed_count = 0
+        
+        for item in queue:
+            if item["status"] == "pending":
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], item["filename"])
+                
+                if os.path.exists(filepath):
+                    try:
+                        print(f"Yazdırma komutu: {filepath}")
+                        os.startfile(filepath, "print")
+                        item["status"] = "completed"
+                        item["printed_at"] = datetime.datetime.now().isoformat()
+                        printed_count += 1
+                    except Exception as print_error:
+                        print(f"Yazdırma hatası ({item['original_filename']}): {print_error}")
+                        failed_count += 1
+        
+        save_print_queue(queue_data)
+        
+        message = f"{printed_count} dosya yazıcıya gönderildi."
+        if failed_count > 0:
+            message += f" {failed_count} dosya yazdırılamadı."
+        
+        return jsonify({
+            "success": True, 
+            "message": message
+        })
+        
+    except Exception as e:
+        print(f"Toplu yazdırma hatası: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
 
 # --- 2. YAZDIRMA Rotası (GÜNCELLENDİ) ---
 @app.route('/print-cart', methods=['POST'])

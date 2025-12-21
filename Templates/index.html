@@ -39,6 +39,92 @@
         #print-all-button { background-color: #28a745; font-weight: bold; }
         #status { font-weight: bold; margin-top: 15px; }
 
+        /* Upload Bölümü Stilleri */
+        #upload-section {
+            margin-top: 40px;
+            border-top: 2px solid #ccc;
+            padding-top: 20px;
+        }
+        #upload-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        #file-input {
+            padding: 10px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+        #upload-button {
+            background-color: #17a2b8;
+            margin-top: 10px;
+        }
+        #upload-status {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        /* Print Queue Stilleri */
+        #print-queue-section {
+            margin-top: 30px;
+        }
+        #print-queue-section h3 {
+            color: #333;
+        }
+        #queue-items {
+            list-style: none;
+            padding: 0;
+        }
+        #queue-items li {
+            font-size: 1em;
+            padding: 12px;
+            background-color: #e9ecef;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 4px;
+        }
+        #queue-items li .queue-info {
+            flex: 1;
+        }
+        #queue-items li .queue-filename {
+            font-weight: bold;
+            color: #333;
+        }
+        #queue-items li .queue-status {
+            font-size: 0.85em;
+            color: #666;
+        }
+        #queue-items li .queue-actions {
+            display: flex;
+            gap: 5px;
+        }
+        #queue-items li .print-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            font-size: 0.85em;
+            cursor: pointer;
+            border-radius: 3px;
+            width: auto;
+        }
+        #queue-items li .remove-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            font-size: 0.85em;
+            cursor: pointer;
+            border-radius: 3px;
+            width: auto;
+        }
+        #print-all-queue-button {
+            background-color: #28a745;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
         /* Yönetim Bölümü Stilleri */
         #admin-section {
             margin-top: 40px;
@@ -101,6 +187,26 @@
     </div>
     <p id="status"></p>
 
+    <!-- DOSYA YÜKLEME BÖLÜMÜ -->
+    <div id="upload-section">
+        <h3>📤 Dosya Yükle ve Yazdır</h3>
+        <div class="form-group">
+            <label for="file-input">PDF veya Resim Dosyası Seçin:</label>
+            <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg">
+        </div>
+        <button id="upload-button">DOSYA YÜKLE</button>
+        <p id="upload-status"></p>
+    </div>
+
+    <!-- YAZDIRMA KUYRUĞU BÖLÜMÜ -->
+    <div id="print-queue-section">
+        <h3>🖨️ Yazdırma Kuyruğu</h3>
+        <ul id="queue-items">
+            <!-- Queue items will be dynamically added here -->
+        </ul>
+        <button id="print-all-queue-button" style="display: none;">TÜM KUYRUĞU YAZDIR</button>
+    </div>
+
     <div id="admin-section">
         <details>
             <summary>Listeyi Düzenle (Yeni Öğe Ekle)</summary>
@@ -140,6 +246,13 @@
         const addWeightBtn = document.getElementById('add-weight-btn');
         const adminStatusEl = document.getElementById('admin-status');
 
+        // DOSYA YÜKLEME Elemanları
+        const fileInput = document.getElementById('file-input');
+        const uploadBtn = document.getElementById('upload-button');
+        const uploadStatusEl = document.getElementById('upload-status');
+        const queueItemsList = document.getElementById('queue-items');
+        const printAllQueueBtn = document.getElementById('print-all-queue-button');
+
         // GÜNCELLENDİ: Sayfa yüklendiğinde tarih alanını mevcut Ay/Yıl ile doldur
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
@@ -149,6 +262,9 @@
             const yyyy = today.getFullYear();
             const mm = String(today.getMonth() + 1).padStart(2, '0');
             tarihInput.value = `${yyyy}-${mm}`; // Format: "YYYY-MM"
+            
+            // Print queue'yu yükle
+            loadPrintQueue();
         });
 
         // ---- SEPET FONKSİYONLARI ----
@@ -273,6 +389,205 @@
                 if (data.success) {
                     setTimeout(() => location.reload(), 1000);
                 }
+            });
+        });
+
+        // ---- DOSYA YÜKLEME VE PRINT QUEUE FONKSİYONLARI ----
+
+        // Dosya yükleme
+        uploadBtn.addEventListener('click', () => {
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                uploadStatusEl.textContent = "Lütfen bir dosya seçin.";
+                uploadStatusEl.style.color = "#dc3545";
+                return;
+            }
+            
+            // Dosya tipi kontrolü
+            const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg'];
+            if (!allowedTypes.includes(file.type)) {
+                uploadStatusEl.textContent = "Hata: Sadece PDF, PNG, JPG dosyaları yükleyebilirsiniz.";
+                uploadStatusEl.style.color = "#dc3545";
+                return;
+            }
+            
+            // Dosya boyutu kontrolü (10MB)
+            const maxSize = 10 * 1024 * 1024;
+            if (file.size > maxSize) {
+                uploadStatusEl.textContent = "Hata: Dosya boyutu 10MB'dan büyük olamaz.";
+                uploadStatusEl.style.color = "#dc3545";
+                return;
+            }
+            
+            uploadStatusEl.textContent = "Yükleniyor...";
+            uploadStatusEl.style.color = "#007bff";
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            fetch('/upload-file', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    uploadStatusEl.textContent = data.message;
+                    uploadStatusEl.style.color = "#28a745";
+                    fileInput.value = ''; // Dosya input'unu temizle
+                    loadPrintQueue(); // Queue'yu yenile
+                } else {
+                    uploadStatusEl.textContent = `Hata: ${data.message}`;
+                    uploadStatusEl.style.color = "#dc3545";
+                }
+            })
+            .catch(err => {
+                uploadStatusEl.textContent = "Hata: Sunucuya bağlanılamadı.";
+                uploadStatusEl.style.color = "#dc3545";
+            });
+        });
+
+        // Print queue'yu yükle
+        function loadPrintQueue() {
+            fetch('/get-print-queue')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    renderPrintQueue(data.queue);
+                }
+            })
+            .catch(err => {
+                console.error('Print queue yükleme hatası:', err);
+            });
+        }
+
+        // Print queue'yu render et
+        function renderPrintQueue(queue) {
+            queueItemsList.innerHTML = '';
+            
+            if (queue.length === 0) {
+                queueItemsList.innerHTML = '<li style="background-color: #f8f9fa; text-align: center;">Yazdırma kuyruğu boş</li>';
+                printAllQueueBtn.style.display = 'none';
+                return;
+            }
+            
+            // Sadece pending ve printing durumundaki öğeleri göster
+            const activeQueue = queue.filter(item => item.status === 'pending' || item.status === 'printing');
+            
+            if (activeQueue.length === 0) {
+                queueItemsList.innerHTML = '<li style="background-color: #f8f9fa; text-align: center;">Yazdırma kuyruğu boş</li>';
+                printAllQueueBtn.style.display = 'none';
+                return;
+            }
+            
+            activeQueue.forEach(item => {
+                const li = document.createElement('li');
+                
+                const statusText = item.status === 'pending' ? '⏳ Bekliyor' : '🖨️ Yazdırılıyor';
+                const statusColor = item.status === 'pending' ? '#666' : '#28a745';
+                
+                li.innerHTML = `
+                    <div class="queue-info">
+                        <div class="queue-filename">${item.original_filename}</div>
+                        <div class="queue-status" style="color: ${statusColor}">${statusText}</div>
+                    </div>
+                    <div class="queue-actions">
+                        ${item.status === 'pending' ? `<button class="print-btn" data-id="${item.id}">Yazdır</button>` : ''}
+                        <button class="remove-btn" data-id="${item.id}">Sil</button>
+                    </div>
+                `;
+                queueItemsList.appendChild(li);
+            });
+            
+            printAllQueueBtn.style.display = 'block';
+        }
+
+        // Queue item'ları için event delegation
+        queueItemsList.addEventListener('click', (e) => {
+            const itemId = parseInt(e.target.dataset.id);
+            
+            if (e.target.classList.contains('print-btn')) {
+                printQueueItem(itemId);
+            } else if (e.target.classList.contains('remove-btn')) {
+                removeFromQueue(itemId);
+            }
+        });
+
+        // Tek bir queue item'ı yazdır
+        function printQueueItem(itemId) {
+            fetch(`/print-queue-item/${itemId}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    uploadStatusEl.textContent = data.message;
+                    uploadStatusEl.style.color = "#28a745";
+                    loadPrintQueue();
+                } else {
+                    uploadStatusEl.textContent = `Hata: ${data.message}`;
+                    uploadStatusEl.style.color = "#dc3545";
+                }
+            })
+            .catch(err => {
+                uploadStatusEl.textContent = "Hata: Yazdırma başarısız.";
+                uploadStatusEl.style.color = "#dc3545";
+            });
+        }
+
+        // Queue'dan öğe sil
+        function removeFromQueue(itemId) {
+            if (!confirm('Bu dosyayı kuyruktan silmek istediğinizden emin misiniz?')) {
+                return;
+            }
+            
+            fetch(`/remove-from-queue/${itemId}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    uploadStatusEl.textContent = data.message;
+                    uploadStatusEl.style.color = "#28a745";
+                    loadPrintQueue();
+                } else {
+                    uploadStatusEl.textContent = `Hata: ${data.message}`;
+                    uploadStatusEl.style.color = "#dc3545";
+                }
+            })
+            .catch(err => {
+                uploadStatusEl.textContent = "Hata: Silme başarısız.";
+                uploadStatusEl.style.color = "#dc3545";
+            });
+        }
+
+        // Tüm kuyruğu yazdır
+        printAllQueueBtn.addEventListener('click', () => {
+            if (!confirm('Kuyruktaki tüm dosyaları yazdırmak istediğinizden emin misiniz?')) {
+                return;
+            }
+            
+            uploadStatusEl.textContent = "Tüm kuyruk yazdırılıyor...";
+            uploadStatusEl.style.color = "#007bff";
+            
+            fetch('/print-all-queue', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    uploadStatusEl.textContent = data.message;
+                    uploadStatusEl.style.color = "#28a745";
+                    loadPrintQueue();
+                } else {
+                    uploadStatusEl.textContent = `Hata: ${data.message}`;
+                    uploadStatusEl.style.color = "#dc3545";
+                }
+            })
+            .catch(err => {
+                uploadStatusEl.textContent = "Hata: Yazdırma başarısız.";
+                uploadStatusEl.style.color = "#dc3545";
             });
         });
 

@@ -56,6 +56,7 @@
 - 🛒 Akıllı sepet sistemi
 - 📱 Mobil uyumlu (PWA)
 - ⚡ Hızlı etiket oluşturma
+- 📁 Çoklu dosya yükleme
 
 </td>
 <td width="50%">
@@ -65,6 +66,7 @@
 - 📅 Otomatik STT hesaplama
 - 🎨 Özelleştirilebilir tasarım
 - 💾 JSON tabanlı veri yönetimi
+- 🤖 Otomatik toplu yazdırma
 
 </td>
 </tr>
@@ -162,6 +164,20 @@ http://[BİLGİSAYAR-ADI].local:5000
 4. Sayfa otomatik yenilenir
 ```
 
+### 4️⃣ Resim/PDF Yükleme ve Otomatik Yazdırma
+
+```plaintext
+1. "📁 Resim/PDF Yükle ve Yazdır" bölümünden dosya seçin
+2. Galeri veya dosya seçicide birden fazla dosya seçebilirsiniz
+3. "YÜKLE" butonuna tıklayın
+4. Dosyalar yazdırma kuyruğuna eklenir
+5. "TÜMÜNÜ OTOMATIK YAZDIR" ile hepsi otomatik yazdırılır
+6. Desteklenen formatlar: PDF, PNG, JPG, JPEG, GIF, BMP
+7. Maksimum dosya boyutu: 16MB
+```
+
+> 💡 **Detaylı bilgi için**: [UPLOAD_FEATURE.md](UPLOAD_FEATURE.md) dosyasına bakın.
+
 ---
 
 ## 📦 Etiket Tasarımı
@@ -249,6 +265,10 @@ Label-System/
 | `/print-cart` | POST | Sepeti yazdır | `cart`, `date` |
 | `/add-spice` | POST | Yeni baharat ekle | `spice_name` |
 | `/add-weight` | POST | Yeni gramaj ekle | `weight_name` |
+| `/upload-files` | POST | Dosya yükle (çoklu) | `files[]` |
+| `/get-upload-queue` | GET | Yükleme kuyruğunu getir | - |
+| `/remove-from-queue` | POST | Kuyruktan dosya sil | `index` |
+| `/print-all-uploads` | POST | Tüm yüklemeleri yazdır | - |
 | `/manifest.json` | GET | PWA manifest | - |
 | `/static/<path>` | GET | Statik dosyalar | - |
 

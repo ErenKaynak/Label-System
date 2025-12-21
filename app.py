@@ -1,7 +1,12 @@
 import os
 import json
 import datetime
-import threading 
+import threading
+import logging
+import subprocess
+import sys
+import uuid
+from werkzeug.utils import secure_filename
 from flask import Flask, render_template, request, jsonify, send_from_directory
 
 # --- PDF Oluşturma Kütüphaneleri ---
@@ -14,6 +19,8 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 # --- Flask Sunucusunu Başlat ---
 app = Flask(__name__, template_folder='Templates')
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 
 # --- Dosya Yolları ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -21,8 +28,27 @@ JSON_PATH = os.path.join(BASE_DIR, 'baharatlar.json')
 PDF_FILE_NAME = os.path.join(BASE_DIR, "etiket.pdf")
 LOGO_PATH = os.path.join(BASE_DIR, "logo.png")
 STATIC_PATH = os.path.join(BASE_DIR, "static")
+UPLOAD_FOLDER = app.config['UPLOAD_FOLDER']
+
+# Allowed file extensions for upload
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp'}
 
 json_lock = threading.Lock()
+upload_queue_lock = threading.Lock()
+upload_queue = []  # Queue for uploaded files
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join(BASE_DIR, 'app.log')),
+        logging.StreamHandler()
+    ]
+)
+
+# Create upload folder if it doesn't exist
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # --- ÇIKARTMA KAĞIDI ÖLÇÜLERİ (GÜNCELLENDİ) ---
 # İSTEK 7: Marjları 0'a 0 yap
@@ -70,6 +96,96 @@ def save_json_data(data):
             print("Başarılı: baharatlar.json dosyası güncellendi.")
         except Exception as e:
             print(f"!!! KRİTİK HATA: JSON yazma hatası: {e}")
+
+
+# --- FILE UPLOAD HELPER FUNCTIONS ---
+
+def allowed_file(filename):
+    """Check if file has an allowed extension"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def print_file_automatically(filepath):
+    """
+    Automatically print a file without user interaction.
+    Works on Windows by using shell print verb.
+    Validates that the file is within the upload directory for security.
+    """
+    try:
+        # Security: Validate that filepath is within UPLOAD_FOLDER
+        abs_filepath = os.path.abspath(filepath)
+        abs_upload_folder = os.path.abspath(UPLOAD_FOLDER)
+        
+        if not abs_filepath.startswith(abs_upload_folder):
+            logging.error(f"Security: Attempted to print file outside upload folder: {filepath}")
+            return False
+        
+        if not os.path.exists(abs_filepath):
+            logging.error(f"File not found: {abs_filepath}")
+            return False
+        
+        if sys.platform == 'win32':
+            # Try using win32api first (best for automation)
+            try:
+                import win32api
+                import win32print
+                
+                # Get default printer
+                printer_name = win32print.GetDefaultPrinter()
+                logging.info(f"Printing to: {printer_name}")
+                
+                # Print using shell execute with 'print' verb
+                win32api.ShellExecute(0, "print", abs_filepath, None, ".", 0)
+                logging.info(f"Successfully sent print job: {abs_filepath}")
+                return True
+            except ImportError:
+                # Fallback to os.startfile if win32api not available
+                logging.warning("win32api not available, using os.startfile")
+                os.startfile(abs_filepath, "print")
+                logging.info(f"Successfully sent print job via os.startfile: {abs_filepath}")
+                return True
+        else:
+            # For Unix-like systems
+            subprocess.run(['lpr', abs_filepath], check=True)
+            logging.info(f"Successfully sent print job: {abs_filepath}")
+            return True
+    except Exception as e:
+        logging.error(f"Error printing file {filepath}: {e}")
+        return False
+
+
+def add_to_upload_queue(filename, filepath):
+    """Add a file to the upload queue"""
+    with upload_queue_lock:
+        upload_queue.append({
+            'filename': filename,
+            'filepath': filepath,
+            'timestamp': datetime.datetime.now().isoformat()
+        })
+        logging.info(f"Added to queue: {filename}")
+
+
+def get_upload_queue():
+    """Get current upload queue"""
+    with upload_queue_lock:
+        return list(upload_queue)
+
+
+def clear_upload_queue():
+    """Clear the upload queue"""
+    with upload_queue_lock:
+        upload_queue.clear()
+        logging.info("Upload queue cleared")
+
+
+def remove_from_queue(index):
+    """Remove a specific item from the queue"""
+    with upload_queue_lock:
+        if 0 <= index < len(upload_queue):
+            removed = upload_queue.pop(index)
+            logging.info(f"Removed from queue: {removed['filename']}")
+            return True
+    return False
 
 
 # --- PDF ETİKET OLUŞTURMA FONKSİYONU (GÜNCELLENDİ) ---
@@ -239,7 +355,134 @@ def add_weight():
         return jsonify({"success": False, "message": f"Sunucu hatası: {e}"}), 500
 
 
-# --- 5. PWA için Manifest ve Static Dosya Rotaları (Aynı) ---
+# --- 5. FILE UPLOAD ROUTES ---
+
+@app.route('/upload-files', methods=['POST'])
+def upload_files():
+    """Handle multiple file uploads and add them to the queue"""
+    try:
+        if 'files[]' not in request.files:
+            logging.warning("No files in request")
+            return jsonify({"success": False, "message": "Dosya seçilmedi."}), 400
+        
+        files = request.files.getlist('files[]')
+        if not files or files[0].filename == '':
+            logging.warning("Empty file list")
+            return jsonify({"success": False, "message": "Dosya seçilmedi."}), 400
+        
+        uploaded_count = 0
+        failed_files = []
+        
+        for file in files:
+            if file and file.filename:
+                if allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    # Use UUID to avoid filename conflicts
+                    unique_id = str(uuid.uuid4())[:8]
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    unique_filename = f"{timestamp}_{unique_id}_{filename}"
+                    filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
+                    
+                    try:
+                        file.save(filepath)
+                        add_to_upload_queue(filename, filepath)
+                        uploaded_count += 1
+                        logging.info(f"Successfully uploaded: {filename}")
+                    except Exception as e:
+                        logging.error(f"Failed to save file {filename}: {e}")
+                        failed_files.append(filename)
+                else:
+                    logging.warning(f"File type not allowed: {file.filename}")
+                    failed_files.append(file.filename)
+        
+        if uploaded_count > 0:
+            message = f"{uploaded_count} dosya başarıyla yüklendi."
+            if failed_files:
+                message += f" {len(failed_files)} dosya başarısız: {', '.join(failed_files)}"
+            logging.info(f"Upload complete: {uploaded_count} success, {len(failed_files)} failed")
+            return jsonify({"success": True, "message": message, "count": uploaded_count})
+        else:
+            return jsonify({"success": False, "message": "Hiçbir dosya yüklenemedi."}), 400
+            
+    except Exception as e:
+        logging.error(f"Upload error: {e}")
+        return jsonify({"success": False, "message": f"Yükleme hatası: {str(e)}"}), 500
+
+
+@app.route('/get-upload-queue', methods=['GET'])
+def get_queue():
+    """Get the current upload queue"""
+    try:
+        queue = get_upload_queue()
+        return jsonify({"success": True, "queue": queue})
+    except Exception as e:
+        logging.error(f"Error getting queue: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route('/remove-from-queue', methods=['POST'])
+def remove_queue_item():
+    """Remove an item from the upload queue"""
+    try:
+        data = request.json
+        index = data.get('index')
+        
+        if index is None:
+            return jsonify({"success": False, "message": "Index gerekli."}), 400
+        
+        if remove_from_queue(index):
+            return jsonify({"success": True, "message": "Dosya kuyruktan kaldırıldı."})
+        else:
+            return jsonify({"success": False, "message": "Geçersiz index."}), 400
+            
+    except Exception as e:
+        logging.error(f"Error removing from queue: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route('/print-all-uploads', methods=['POST'])
+def print_all_uploads():
+    """Automatically print all files in the upload queue"""
+    try:
+        queue = get_upload_queue()
+        
+        if not queue:
+            logging.warning("Print all called with empty queue")
+            return jsonify({"success": False, "message": "Yazdırma kuyruğu boş."}), 400
+        
+        success_count = 0
+        failed_files = []
+        
+        for item in queue:
+            filepath = item['filepath']
+            filename = item['filename']
+            
+            if os.path.exists(filepath):
+                if print_file_automatically(filepath):
+                    success_count += 1
+                else:
+                    failed_files.append(filename)
+            else:
+                logging.error(f"File not found: {filepath}")
+                failed_files.append(filename)
+        
+        # Clear the queue after printing
+        if success_count > 0:
+            clear_upload_queue()
+            message = f"{success_count} dosya yazıcıya gönderildi."
+            if failed_files:
+                message += f" {len(failed_files)} dosya başarısız."
+            logging.info(f"Print all complete: {success_count} success, {len(failed_files)} failed")
+            return jsonify({"success": True, "message": message})
+        else:
+            return jsonify({"success": False, "message": "Hiçbir dosya yazdırılamadı."}), 500
+            
+    except Exception as e:
+        logging.error(f"Print all error: {e}")
+        return jsonify({"success": False, "message": f"Yazdırma hatası: {str(e)}"}), 500
+
+
+# --- 6. PWA için Manifest ve Static Dosya Rotaları (Aynı) ---
 @app.route('/manifest.json')
 def serve_manifest():
     return send_from_directory(STATIC_PATH, 'manifest.json')

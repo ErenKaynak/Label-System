@@ -1,0 +1,35 @@
+# Upload folder
+uploads/
+
+# Log files
+*.log
+app.log
+
+# PDF files
+etiket.pdf
+ETIKET_TEST.pdf
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp

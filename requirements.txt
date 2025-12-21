@@ -1,0 +1,4 @@
+Flask>=2.0.0
+reportlab>=3.6.0
+Werkzeug>=2.0.0
+pywin32>=300; sys_platform == 'win32'

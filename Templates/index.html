@@ -39,6 +39,35 @@
         #print-all-button { background-color: #28a745; font-weight: bold; }
         #status { font-weight: bold; margin-top: 15px; }
 
+        /* Upload Section Styles */
+        #upload-section {
+            margin-top: 40px;
+            border-top: 2px solid #ccc;
+            padding-top: 20px;
+        }
+        #upload-queue-items li {
+            font-size: 1em;
+            padding: 10px;
+            background-color: #e3f2fd;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 3px;
+        }
+        #upload-queue-items li .remove-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            font-size: 0.8em;
+            cursor: pointer;
+            width: auto;
+            border-radius: 3px;
+        }
+        #upload-status { font-weight: bold; }
+        #file-upload { cursor: pointer; }
+
         /* Yönetim Bölümü Stilleri */
         #admin-section {
             margin-top: 40px;
@@ -100,6 +129,27 @@
         <button id="print-all-button" style="display: none;">TÜMÜNÜ YAZDIR</button>
     </div>
     <p id="status"></p>
+
+    <!-- NEW: File Upload Section -->
+    <div id="upload-section" style="margin-top: 40px; border-top: 2px solid #ccc; padding-top: 20px;">
+        <h3>📁 Resim/PDF Yükle ve Yazdır</h3>
+        <div class="form-group">
+            <label for="file-upload">Dosya Seç (Çoklu seçim desteklenir):</label>
+            <input type="file" id="file-upload" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp" 
+                   style="padding: 10px; font-size: 1em;">
+            <button id="upload-button" style="background-color: #17a2b8; margin-top: 10px;">YÜKLE</button>
+        </div>
+        
+        <div id="upload-queue-section" style="margin-top: 20px;">
+            <h4>Yazdırma Kuyruğu</h4>
+            <ul id="upload-queue-items" style="list-style: none; padding: 0;">
+            </ul>
+            <button id="print-all-uploads-button" style="display: none; background-color: #28a745; font-weight: bold;">
+                TÜMÜNÜ OTOMATIK YAZDIR
+            </button>
+        </div>
+        <p id="upload-status" style="font-weight: bold; margin-top: 10px;"></p>
+    </div>
 
     <div id="admin-section">
         <details>
@@ -274,6 +324,150 @@
                     setTimeout(() => location.reload(), 1000);
                 }
             });
+        });
+
+        // ---- FILE UPLOAD FONKSİYONLARI ----
+
+        const fileUploadInput = document.getElementById('file-upload');
+        const uploadButton = document.getElementById('upload-button');
+        const uploadQueueList = document.getElementById('upload-queue-items');
+        const printAllUploadsBtn = document.getElementById('print-all-uploads-button');
+        const uploadStatusEl = document.getElementById('upload-status');
+
+        // Load queue on page load
+        function loadUploadQueue() {
+            fetch('/get-upload-queue')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        renderUploadQueue(data.queue);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading upload queue:', err);
+                });
+        }
+
+        // Render upload queue
+        function renderUploadQueue(queue) {
+            uploadQueueList.innerHTML = '';
+            if (!queue || queue.length === 0) {
+                printAllUploadsBtn.style.display = 'none';
+                return;
+            }
+            
+            queue.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span>📄 ${item.filename}</span>
+                    <button class="remove-btn" data-index="${index}">Sil</button>
+                `;
+                uploadQueueList.appendChild(li);
+            });
+            printAllUploadsBtn.style.display = 'block';
+        }
+
+        // Upload files
+        uploadButton.addEventListener('click', () => {
+            const files = fileUploadInput.files;
+            
+            if (!files || files.length === 0) {
+                uploadStatusEl.textContent = 'Lütfen en az bir dosya seçin.';
+                uploadStatusEl.style.color = '#dc3545';
+                return;
+            }
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files[]', files[i]);
+            }
+
+            uploadStatusEl.textContent = 'Dosyalar yükleniyor...';
+            uploadStatusEl.style.color = '#000';
+
+            fetch('/upload-files', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    uploadStatusEl.textContent = data.message;
+                    uploadStatusEl.style.color = '#28a745';
+                    fileUploadInput.value = ''; // Clear file input
+                    loadUploadQueue(); // Reload queue
+                } else {
+                    uploadStatusEl.textContent = `Hata: ${data.message}`;
+                    uploadStatusEl.style.color = '#dc3545';
+                }
+            })
+            .catch(err => {
+                uploadStatusEl.textContent = 'Hata: Sunucuya bağlanılamadı.';
+                uploadStatusEl.style.color = '#dc3545';
+                console.error('Upload error:', err);
+            });
+        });
+
+        // Remove from queue
+        uploadQueueList.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-btn')) {
+                const index = parseInt(e.target.dataset.index);
+                
+                fetch('/remove-from-queue', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ index: index })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        uploadStatusEl.textContent = data.message;
+                        uploadStatusEl.style.color = '#28a745';
+                        loadUploadQueue(); // Reload queue
+                    } else {
+                        uploadStatusEl.textContent = `Hata: ${data.message}`;
+                        uploadStatusEl.style.color = '#dc3545';
+                    }
+                })
+                .catch(err => {
+                    uploadStatusEl.textContent = 'Hata: Silme işlemi başarısız.';
+                    uploadStatusEl.style.color = '#dc3545';
+                });
+            }
+        });
+
+        // Print all uploads automatically
+        printAllUploadsBtn.addEventListener('click', () => {
+            if (confirm('Tüm dosyalar otomatik olarak yazıcıya gönderilecek. Devam etmek istiyor musunuz?')) {
+                uploadStatusEl.textContent = 'Dosyalar yazıcıya gönderiliyor...';
+                uploadStatusEl.style.color = '#000';
+                
+                fetch('/print-all-uploads', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        uploadStatusEl.textContent = data.message;
+                        uploadStatusEl.style.color = '#28a745';
+                        loadUploadQueue(); // Reload queue (should be empty now)
+                    } else {
+                        uploadStatusEl.textContent = `Hata: ${data.message}`;
+                        uploadStatusEl.style.color = '#dc3545';
+                    }
+                })
+                .catch(err => {
+                    uploadStatusEl.textContent = 'Hata: Yazdırma işlemi başarısız.';
+                    uploadStatusEl.style.color = '#dc3545';
+                    console.error('Print error:', err);
+                });
+            }
+        });
+
+        // Load upload queue on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUploadQueue();
         });
 
     </script>

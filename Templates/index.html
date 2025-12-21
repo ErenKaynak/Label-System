@@ -405,7 +405,7 @@
             }
             
             // Dosya tipi kontrolü
-            const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+            const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg'];
             if (!allowedTypes.includes(file.type)) {
                 uploadStatusEl.textContent = "Hata: Sadece PDF, PNG, JPG dosyaları yükleyebilirsiniz.";
                 uploadStatusEl.style.color = "#dc3545";

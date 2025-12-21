@@ -119,8 +119,14 @@ def save_print_queue(queue_data):
 def add_to_print_queue(filename, original_filename):
     """Dosyayı print queue'ya ekler."""
     queue_data = load_print_queue()
+    
+    # Generate unique ID by finding the maximum ID and adding 1
+    max_id = 0
+    if queue_data["queue"]:
+        max_id = max(item["id"] for item in queue_data["queue"])
+    
     queue_item = {
-        "id": len(queue_data["queue"]) + 1,
+        "id": max_id + 1,
         "filename": filename,
         "original_filename": original_filename,
         "timestamp": datetime.datetime.now().isoformat(),
@@ -280,14 +286,13 @@ def remove_from_queue(item_id):
         queue = queue_data["queue"]
         
         # ID'ye göre öğeyi bul
-        item_to_remove = None
-        for i, item in enumerate(queue):
-            if item["id"] == item_id:
-                item_to_remove = queue.pop(i)
-                break
+        item_to_remove = next((item for item in queue if item["id"] == item_id), None)
         
         if item_to_remove is None:
             return jsonify({"success": False, "message": "Öğe bulunamadı."}), 404
+        
+        # Öğeyi listeden çıkar
+        queue.remove(item_to_remove)
         
         # Dosyayı sil
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], item_to_remove["filename"])
@@ -310,11 +315,7 @@ def print_queue_item(item_id):
         queue = queue_data["queue"]
         
         # ID'ye göre öğeyi bul
-        item_to_print = None
-        for item in queue:
-            if item["id"] == item_id:
-                item_to_print = item
-                break
+        item_to_print = next((item for item in queue if item["id"] == item_id), None)
         
         if item_to_print is None:
             return jsonify({"success": False, "message": "Öğe bulunamadı."}), 404
@@ -330,18 +331,24 @@ def print_queue_item(item_id):
         save_print_queue(queue_data)
         
         # Dosyayı yazdır
-        print(f"Yazdırma komutu: {filepath}")
-        os.startfile(filepath, "print")
-        
-        # Durumu tamamlandı olarak işaretle
-        item_to_print["status"] = "completed"
-        item_to_print["printed_at"] = datetime.datetime.now().isoformat()
-        save_print_queue(queue_data)
-        
-        return jsonify({
-            "success": True, 
-            "message": f"'{item_to_print['original_filename']}' yazıcıya gönderildi."
-        })
+        try:
+            print(f"Yazdırma komutu: {filepath}")
+            os.startfile(filepath, "print")
+            
+            # Durumu tamamlandı olarak işaretle
+            item_to_print["status"] = "completed"
+            item_to_print["printed_at"] = datetime.datetime.now().isoformat()
+            save_print_queue(queue_data)
+            
+            return jsonify({
+                "success": True, 
+                "message": f"'{item_to_print['original_filename']}' yazıcıya gönderildi."
+            })
+        except Exception as print_error:
+            # Yazdırma hatası durumunda durumu geri al
+            item_to_print["status"] = "pending"
+            save_print_queue(queue_data)
+            raise print_error
         
     except Exception as e:
         print(f"Yazdırma hatası: {e}")
@@ -356,22 +363,32 @@ def print_all_queue():
         queue = queue_data["queue"]
         
         printed_count = 0
+        failed_count = 0
+        
         for item in queue:
             if item["status"] == "pending":
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], item["filename"])
                 
                 if os.path.exists(filepath):
-                    print(f"Yazdırma komutu: {filepath}")
-                    os.startfile(filepath, "print")
-                    item["status"] = "completed"
-                    item["printed_at"] = datetime.datetime.now().isoformat()
-                    printed_count += 1
+                    try:
+                        print(f"Yazdırma komutu: {filepath}")
+                        os.startfile(filepath, "print")
+                        item["status"] = "completed"
+                        item["printed_at"] = datetime.datetime.now().isoformat()
+                        printed_count += 1
+                    except Exception as print_error:
+                        print(f"Yazdırma hatası ({item['original_filename']}): {print_error}")
+                        failed_count += 1
         
         save_print_queue(queue_data)
         
+        message = f"{printed_count} dosya yazıcıya gönderildi."
+        if failed_count > 0:
+            message += f" {failed_count} dosya yazdırılamadı."
+        
         return jsonify({
             "success": True, 
-            "message": f"{printed_count} dosya yazıcıya gönderildi."
+            "message": message
         })
         
     except Exception as e:

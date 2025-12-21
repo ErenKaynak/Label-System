@@ -17,8 +17,9 @@ etiket.pdf
 ETIKET_TEST.pdf
 *.pdf
 
-# Uploads directory
+# Uploads directory and print queue
 uploads/
+print_queue.json
 
 # IDE
 .vscode/

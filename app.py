@@ -5,6 +5,7 @@ import threading
 import logging
 import subprocess
 import sys
+import uuid
 from werkzeug.utils import secure_filename
 from flask import Flask, render_template, request, jsonify, send_from_directory
 
@@ -18,7 +19,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 # --- Flask Sunucusunu Başlat ---
 app = Flask(__name__, template_folder='Templates')
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 
 # --- Dosya Yolları ---
@@ -108,8 +109,21 @@ def print_file_automatically(filepath):
     """
     Automatically print a file without user interaction.
     Works on Windows by using shell print verb.
+    Validates that the file is within the upload directory for security.
     """
     try:
+        # Security: Validate that filepath is within UPLOAD_FOLDER
+        abs_filepath = os.path.abspath(filepath)
+        abs_upload_folder = os.path.abspath(UPLOAD_FOLDER)
+        
+        if not abs_filepath.startswith(abs_upload_folder):
+            logging.error(f"Security: Attempted to print file outside upload folder: {filepath}")
+            return False
+        
+        if not os.path.exists(abs_filepath):
+            logging.error(f"File not found: {abs_filepath}")
+            return False
+        
         if sys.platform == 'win32':
             # Try using win32api first (best for automation)
             try:
@@ -121,19 +135,19 @@ def print_file_automatically(filepath):
                 logging.info(f"Printing to: {printer_name}")
                 
                 # Print using shell execute with 'print' verb
-                win32api.ShellExecute(0, "print", filepath, None, ".", 0)
-                logging.info(f"Successfully sent print job: {filepath}")
+                win32api.ShellExecute(0, "print", abs_filepath, None, ".", 0)
+                logging.info(f"Successfully sent print job: {abs_filepath}")
                 return True
             except ImportError:
                 # Fallback to os.startfile if win32api not available
                 logging.warning("win32api not available, using os.startfile")
-                os.startfile(filepath, "print")
-                logging.info(f"Successfully sent print job via os.startfile: {filepath}")
+                os.startfile(abs_filepath, "print")
+                logging.info(f"Successfully sent print job via os.startfile: {abs_filepath}")
                 return True
         else:
             # For Unix-like systems
-            subprocess.run(['lpr', filepath], check=True)
-            logging.info(f"Successfully sent print job: {filepath}")
+            subprocess.run(['lpr', abs_filepath], check=True)
+            logging.info(f"Successfully sent print job: {abs_filepath}")
             return True
     except Exception as e:
         logging.error(f"Error printing file {filepath}: {e}")
@@ -363,9 +377,10 @@ def upload_files():
             if file and file.filename:
                 if allowed_file(file.filename):
                     filename = secure_filename(file.filename)
-                    # Add timestamp to avoid filename conflicts
+                    # Use UUID to avoid filename conflicts
+                    unique_id = str(uuid.uuid4())[:8]
                     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    unique_filename = f"{timestamp}_{filename}"
+                    unique_filename = f"{timestamp}_{unique_id}_{filename}"
                     filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
                     
                     try:

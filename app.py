@@ -18,6 +18,8 @@ from reportlab.lib.utils import ImageReader
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph
 
+from product_profiles import SPICE_PROFILES
+
 app = Flask(__name__, template_folder='Templates')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 JSON_PATH = os.path.join(BASE_DIR, 'baharatlar.json')
@@ -25,14 +27,17 @@ BUSINESS_PATH = os.path.join(BASE_DIR, 'isletme.json')
 STATIC_PATH = os.path.join(BASE_DIR, 'static')
 LOGO_PATH = os.path.join(BASE_DIR, 'logo.png')
 json_lock = threading.RLock()
-DEFAULT_STORAGE = 'Serin, kuru ve güneş görmeyen yerde muhafaza ediniz.'
+DEFAULT_STORAGE = 'Serin, kuru ve güneşten uzak tutunuz.'
 LOT_STATEMENT = 'Parti/lot numarası, tavsiye edilen tüketim tarihidir.'
 logo = ImageReader(LOGO_PATH)
 logo_source_width, logo_source_height = logo.getSize()
+# logo.png içindeki görünür çizimin yatay merkezi (beyaz kenarlar hariç).
+LOGO_ARTWORK_CENTER_X = 200
 
 
-def draw_logo(c, x, y, height):
-    width = height * logo_source_width / logo_source_height
+def draw_logo(c, x, y, height, width=None):
+    if width is None:
+        width = height * logo_source_width / logo_source_height
     c.drawImage(logo, x, y, width=width, height=height)
     return width
 
@@ -41,6 +46,7 @@ FONT_PAIRS = [
     ('/System/Library/Fonts/Supplemental/Arial.ttf', '/System/Library/Fonts/Supplemental/Arial Bold.ttf'),
     ('/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf', '/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf'),
     ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
+    ('/usr/share/fonts/TTF/DejaVuSans.ttf', '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf'),
 ]
 for regular_path, bold_path in FONT_PAIRS:
     if os.path.isfile(regular_path) and os.path.isfile(bold_path):
@@ -51,20 +57,19 @@ for regular_path, bold_path in FONT_PAIRS:
 else:
     raise RuntimeError('Türkçe karakterleri destekleyen bir TrueType font bulunamadı.')
 
-# 9 pt Arial/Liberation/DejaVu için küçük harf yüksekliği 1,2 mm'nin üstündedir.
+# 8 pt Arial/Liberation/DejaVu için küçük harf yüksekliği 1,2 mm'nin üstündedir.
 # PDF her zaman gerçek ölçekte basılmalıdır; baskıdaki fiziksel ölçü kontrol edilmelidir.
-BODY_SIZE = 9
-LINE_HEIGHT = 11
-SPICE_SUGGESTIONS = {
-    'TOZ BİBER': 'Öğütülmüş kırmızıbiber',
-    'KİMYON': 'Kimyon',
-    'KARABİBER TANE': 'Tane karabiber',
-    'NANE': 'Kurutulmuş nane',
-    'KEKİK': '',
-    'PUL BİBER': 'Pul kırmızıbiber',
-}
-
-
+BODY_SIZE = 8
+LINE_HEIGHT = 10
+NUTRITION_FIELDS = (
+    ('calories', 'Kalori'),
+    ('fat', 'Toplam yağ'),
+    ('carbohydrate', 'Karbonhidrat'),
+    ('sugar', 'Şeker'),
+    ('protein', 'Protein'),
+    ('fiber', 'Lif'),
+    ('sodium', 'Sodyum'),
+)
 def load_json_data():
     with json_lock:
         if not os.path.exists(JSON_PATH):
@@ -109,6 +114,17 @@ def required_text(value, label, max_length=180):
     return value
 
 
+def optional_text(value, label, max_length=180):
+    if value is None:
+        return ''
+    if not isinstance(value, str):
+        raise ValueError(f'{label} metin olmalıdır.')
+    value = ' '.join(value.split())
+    if len(value) > max_length:
+        raise ValueError(f'{label} en fazla {max_length} karakter olabilir.')
+    return value
+
+
 def wrap_text(text, font, size, width):
     words = text.split()
     lines = []
@@ -141,6 +157,9 @@ def draw_lines(c, text, x, y, width, font='Label-Regular', size=BODY_SIZE,
 
 
 def draw_ingredients(c, ingredients, allergens, x, y, width):
+    if not ingredients:
+        return y
+
     terms = [term.strip() for term in allergens.split(',') if term.strip()]
     if terms:
         pattern = re.compile('(' + '|'.join(re.escape(term) for term in sorted(terms, key=len, reverse=True)) + ')', re.IGNORECASE)
@@ -157,6 +176,55 @@ def draw_ingredients(c, ingredients, allergens, x, y, width):
         raise ValueError('İçindekiler etikete sığmıyor. Metni kısaltın.')
     paragraph.drawOn(c, x, y - height + LINE_HEIGHT - 2)
     return y - height
+
+
+def draw_tett(c, date, x, y, width, line_height=LINE_HEIGHT):
+    text = 'TETT: ' + date
+    if pdfmetrics.stringWidth(text, 'Label-Bold', BODY_SIZE) > width:
+        raise ValueError(f'Etiket alanına sığmıyor: {text}')
+    c.setFont('Label-Bold', BODY_SIZE)
+    c.drawString(x, y, text)
+    c.setLineWidth(0.5)
+    c.line(x, y - 2.5, x + width, y - 2.5)
+    return y - line_height
+
+
+def draw_nutrition_table(c, nutrition, x, y, width, columns=2):
+    compact_labels = {
+        'calories': 'Enerji',
+        'fat': 'Yağ',
+        'carbohydrate': 'Karb.',
+        'sugar': 'Şeker',
+        'protein': 'Protein',
+        'fiber': 'Lif',
+        'sodium': 'Sodyum',
+    }
+    entries = [(compact_labels[key], nutrition[key]) for key, _ in NUTRITION_FIELDS
+               if nutrition.get(key)]
+    if not entries:
+        return y
+
+    heading_size = 8.2
+    value_size = 7.2
+    row_height = 7.5
+    gap = 2 * mm
+    column_width = (width - gap * (columns - 1)) / columns
+    c.setFont('Label-Bold', heading_size)
+    c.drawString(x, y, 'Besin Değerleri')
+    c.setLineWidth(0.3)
+    c.line(x, y - 2.5, x + width, y - 2.5)
+    y -= 9.5
+
+    c.setFont('Label-Regular', value_size)
+    for index, (label, value) in enumerate(entries):
+        column = index % columns
+        text = f'{label}: {value}'
+        if pdfmetrics.stringWidth(text, 'Label-Regular', value_size) > column_width:
+            raise ValueError(f'Besin değeri etikete sığmıyor: {text}')
+        c.drawString(x + column * (column_width + gap), y, text)
+        if column == columns - 1 or index == len(entries) - 1:
+            y -= row_height
+    return y
 
 
 def draw_label(c, x, y, width, height, item, common):
@@ -176,15 +244,16 @@ def draw_label(c, x, y, width, height, item, common):
     rx = lx + left_w + gap
     top = y + height - pad - (5 if wide_label else 10)
     bottom = y + pad + (1 if wide_label else 2)
+    detail_line_height = 9 if item.get('nutrition') else (10 if wide_label else LINE_HEIGHT)
 
     name = item['spice']
     weight = item['weight']
-    title = f'{name}   |   Net: {weight}'
+    title = f'{name}   {weight}'
     title_size = 12
     if pdfmetrics.stringWidth(title, 'Label-Bold', title_size) > inner:
         title_size = 10
     if pdfmetrics.stringWidth(title, 'Label-Bold', title_size) > inner:
-        raise ValueError(f'Ürün adı ve net miktar etikete sığmıyor: {name}')
+        raise ValueError(f'Ürün adı ve gramaj etikete sığmıyor: {name}')
     c.setFont('Label-Bold', title_size)
     c.drawString(lx, top, title)
     c.setLineWidth(0.35)
@@ -194,26 +263,30 @@ def draw_label(c, x, y, width, height, item, common):
     left_y = draw_ingredients(c, item['ingredients'], item['allergens'], lx, left_y, left_w)
     if item['allergens']:
         left_y = draw_lines(c, 'Alerjen: ' + item['allergens'], lx, left_y, left_w,
-                            font='Label-Bold', max_lines=2)
-    left_y = draw_lines(c, 'Menşe ülke: ' + item['origin'], lx, left_y, left_w,
-                        max_lines=1 if wide_label else 2)
+                            font='Label-Bold', max_lines=2, line_height=detail_line_height)
+    left_y = draw_lines(c, 'Menşei: ' + item['origin'], lx, left_y, left_w,
+                        max_lines=1 if wide_label else 2, line_height=detail_line_height)
     left_y = draw_lines(c, 'Muhafaza: ' + item['storage'], lx, left_y, left_w,
-                        max_lines=3)
+                        max_lines=3, line_height=detail_line_height)
 
     right_y = top - (13 if wide_label else 17)
-    compact = 10 if wide_label else LINE_HEIGHT
-    right_y = draw_lines(c, 'TETT: ' + item['date'], rx, right_y, right_w,
-                         max_lines=1, line_height=compact)
+    right_y = draw_tett(c, item['date'], rx, right_y, right_w,
+                        line_height=detail_line_height)
     right_y = draw_lines(c, LOT_STATEMENT, rx, right_y, right_w,
-                         max_lines=2 if wide_label else 3, line_height=compact)
+                         max_lines=2 if wide_label else 3, line_height=detail_line_height)
     right_y = draw_lines(c, 'İşletmeci: ' + common['operator'],
                          rx, right_y, right_w, max_lines=2 if wide_label else 3,
-                         line_height=compact)
+                         line_height=detail_line_height)
     right_y = draw_lines(c, 'Adres: ' + common['address'], rx, right_y, right_w,
-                         max_lines=3 if wide_label else 4, line_height=compact)
+                         max_lines=3 if wide_label else 4, line_height=detail_line_height)
     right_y = draw_lines(c, ('Kayıt no: ' if wide_label else 'İşletme kayıt no: ') + common['registration'],
-                         rx, right_y, right_w, max_lines=2, line_height=compact)
-    if left_y < bottom or right_y < bottom:
+                         rx, right_y, right_w, max_lines=2, line_height=detail_line_height)
+    nutrition_y = min(left_y, right_y)
+    if item.get('nutrition'):
+        nutrition_y = draw_nutrition_table(
+            c, item['nutrition'], lx, nutrition_y - 2, inner,
+            columns=4 if wide_label else 3)
+    if min(left_y, right_y, nutrition_y) < bottom:
         raise ValueError(f'{name} için bilgiler yatay etikete sığmıyor. Metinleri kısaltın.')
 
 
@@ -221,17 +294,18 @@ def draw_vertical_label(c, width, height, item, common):
     pad = 4 * mm
     x = pad
     text_width = width - 2 * pad
-    vertical_logo_width = 34 * mm
-    vertical_logo_height = vertical_logo_width * logo_source_height / logo_source_width
-    draw_logo(c, (width - vertical_logo_width) / 2,
-              height - pad - vertical_logo_height, vertical_logo_height)
+    vertical_logo_height = 34 * mm * logo_source_height / logo_source_width
+    vertical_logo_width = 75 * mm
+    vertical_logo_x = width / 2 - vertical_logo_width * LOGO_ARTWORK_CENTER_X / logo_source_width
+    detail_line_height = 9 if item.get('nutrition') else 10
+    draw_logo(c, vertical_logo_x,
+              height - pad - vertical_logo_height, vertical_logo_height,
+              width=vertical_logo_width)
     y = height - pad - vertical_logo_height - 3 * mm
     bottom = pad + 5
 
-    y = draw_lines(c, item['spice'], x, y, text_width,
+    y = draw_lines(c, f"{item['spice']}   {item['weight']}", x, y, text_width,
                    font='Label-Bold', size=13, max_lines=2)
-    y = draw_lines(c, 'Net: ' + item['weight'], x, y - 2, text_width,
-                   font='Label-Bold', size=11, max_lines=1)
     c.setLineWidth(0.4)
     c.line(x, y + 2, width - pad, y + 2)
     y -= 6
@@ -239,24 +313,26 @@ def draw_vertical_label(c, width, height, item, common):
     y = draw_ingredients(c, item['ingredients'], item['allergens'], x, y, text_width)
     if item['allergens']:
         y = draw_lines(c, 'Alerjen: ' + item['allergens'], x, y, text_width,
-                       font='Label-Bold', max_lines=2, line_height=10)
-    y = draw_lines(c, 'Menşe ülke: ' + item['origin'], x, y, text_width,
-                   max_lines=2, line_height=10)
+                       font='Label-Bold', max_lines=2, line_height=detail_line_height)
+    y = draw_lines(c, 'Menşei: ' + item['origin'], x, y, text_width,
+                   max_lines=2, line_height=detail_line_height)
     y = draw_lines(c, 'Muhafaza: ' + item['storage'], x, y, text_width,
-                   max_lines=3, line_height=10)
+                   max_lines=3, line_height=detail_line_height)
 
     c.line(x, y + 6, width - pad, y + 6)
     y -= 4
-    y = draw_lines(c, 'TETT: ' + item['date'], x, y, text_width,
-                   max_lines=1, line_height=10)
+    y = draw_tett(c, item['date'], x, y, text_width,
+                  line_height=detail_line_height)
     y = draw_lines(c, LOT_STATEMENT, x, y, text_width,
-                   max_lines=3, line_height=10)
+                   max_lines=3, line_height=detail_line_height)
     y = draw_lines(c, 'İşletmeci: ' + common['operator'], x, y, text_width,
-                   max_lines=3, line_height=10)
+                   max_lines=3, line_height=detail_line_height)
     y = draw_lines(c, 'Adres: ' + common['address'], x, y, text_width,
-                   max_lines=4, line_height=10)
+                   max_lines=4, line_height=detail_line_height)
     y = draw_lines(c, 'İşletme kayıt no: ' + common['registration'],
-                   x, y, text_width, max_lines=2, line_height=10)
+                   x, y, text_width, max_lines=2, line_height=detail_line_height)
+    if item.get('nutrition'):
+        y = draw_nutrition_table(c, item['nutrition'], x, y - 2, text_width, columns=2)
     if y < bottom:
         raise ValueError(f"{item['spice']} için bilgiler dikey etikete sığmıyor. Metinleri kısaltın.")
 
@@ -277,6 +353,9 @@ def create_labels_pdf(cart, common, orientation):
                         pdf.saveState()
                         pdf.translate(cell_x + label_w, cell_y)
                         pdf.rotate(90)
+                        label_clip = pdf.beginPath()
+                        label_clip.rect(0, 0, label_h, label_w)
+                        pdf.clipPath(label_clip, stroke=0, fill=0)
                         draw_vertical_label(pdf, label_h, label_w, item, common)
                         pdf.restoreState()
                     else:
@@ -310,9 +389,9 @@ def prepare_pdf_from_request():
         if isinstance(pages, bool) or not isinstance(pages, int) or not 1 <= pages <= 100:
             raise ValueError('Sayfa sayısı 1-100 arasında olmalıdır.')
         item = {key: required_text(raw.get(key), label) for key, label in (
-            ('spice', 'Ürün adı'), ('weight', 'Net miktar'),
-            ('ingredients', 'İçindekiler'), ('origin', 'Menşe ülke'),
-            ('date', 'TETT'))}
+            ('spice', 'Ürün adı'), ('weight', 'Gramaj'),
+            ('origin', 'Menşei'), ('date', 'TETT'))}
+        item['ingredients'] = optional_text(raw.get('ingredients'), 'İçindekiler')
         item['storage'] = required_text(raw.get('storage') or DEFAULT_STORAGE, 'Muhafaza koşulu')
         try:
             item['date'] = datetime.strptime(item['date'], '%Y-%m-%d').strftime('%d.%m.%Y')
@@ -323,6 +402,21 @@ def prepare_pdf_from_request():
         item['allergens'] = str(raw.get('allergens') or '').strip()
         if len(item['allergens']) > 120:
             raise ValueError('Alerjen bilgisi çok uzun.')
+        raw_nutrition = raw.get('nutrition', {})
+        if raw_nutrition is None:
+            raw_nutrition = {}
+        if not isinstance(raw_nutrition, dict):
+            raise ValueError('Besin değerleri geçersiz.')
+        item['nutrition'] = {}
+        for key, label in NUTRITION_FIELDS:
+            raw_value = raw_nutrition.get(key)
+            if raw_value is not None and not isinstance(raw_value, str):
+                raise ValueError(f'{label} metin olarak girilmelidir.')
+            value = ' '.join((raw_value or '').split())
+            if len(value) > 40:
+                raise ValueError(f'{label} en fazla 40 karakter olabilir.')
+            if value:
+                item['nutrition'][key] = value
         item['pages'] = pages
         cart.append(item)
         total_pages += pages
@@ -335,7 +429,7 @@ def prepare_pdf_from_request():
 def index():
     data = load_json_data()
     return render_template('index.html', baharat_listesi=data.get('baharatlar', []),
-                           gramaj_listesi=data.get('gramajlar', []), suggestions=SPICE_SUGGESTIONS,
+                           gramaj_listesi=data.get('gramajlar', []), profiles=SPICE_PROFILES,
                            business=load_business_settings(), default_storage=DEFAULT_STORAGE)
 
 

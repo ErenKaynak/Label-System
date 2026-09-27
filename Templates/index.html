@@ -17,9 +17,11 @@
     .actions {display:flex;gap:10px;flex-wrap:wrap} .actions button {flex:1;min-width:180px}
     .hint {color:#4c5e51;font-size:.9rem;line-height:1.45} .notice {background:#fff7df;border-left:4px solid #a97712;padding:12px;line-height:1.45}
     .check {display:flex;gap:9px;align-items:flex-start;font-weight:400;margin:14px 0}.check input {width:auto;margin:3px 0 0}
+    .optional-fields {margin:14px 0;border-block:1px solid #d7dfd8;padding:12px 0}.optional-fields summary {cursor:pointer;font-weight:700}.optional-fields[open] summary {margin-bottom:10px}
+    .nutrition-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
     #cart-items {padding:0;list-style:none} #cart-items li {display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px;border-bottom:1px solid #e4e9e5}
     #status,#admin-status {font-weight:600;min-height:1.3em} details summary {cursor:pointer;font-weight:600}
-    @media(max-width:590px){.grid{grid-template-columns:1fr}}
+    @media(max-width:590px){.grid,.nutrition-grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -39,18 +41,33 @@
     <h2>Ürün bilgisi</h2>
     <div class="grid">
       <label>Baharat<select id="spice-select">{% for baharat in baharat_listesi %}<option value="{{ baharat }}">{{ baharat }}</option>{% endfor %}</select></label>
-      <label>Net miktar<select id="weight-select">{% for gramaj in gramaj_listesi %}<option value="{{ gramaj }}">{{ gramaj }}</option>{% endfor %}</select></label>
+      <label>Gramaj<select id="weight-select">{% for gramaj in gramaj_listesi %}<option value="{{ gramaj }}">{{ gramaj }}</option>{% endfor %}</select></label>
     </div>
-    <label>İçindekiler (gerçek reçete; miktar sırasına göre)<textarea id="ingredients" required></textarea></label>
+    <label>İçindekiler (isteğe bağlı; gerçek reçete, miktar sırasına göre)<textarea id="ingredients"></textarea></label>
+    <p id="profile-note" class="notice"></p>
     <div class="grid">
-      <label>Alerjenler (varsa; içerikteki alerjenleri açıkça belirtin)<input id="allergens" placeholder="Örn. hardal"></label>
-      <label>Menşe ülke<input id="origin" placeholder="Örn. Türkiye" required></label>
+      <label>Alerjenler (varsa; içerikteki alerjenleri açıkça belirtin)<input id="allergens" placeholder="Tedarikçi/üretim kaydından doğrulayın"></label>
+      <label>Menşei<input id="origin" placeholder="Tedarikçi belgesindeki ülke" required></label>
     </div>
     <label>Muhafaza koşulu<input id="storage" value="{{ default_storage }}" required></label>
+    <details class="optional-fields">
+      <summary>Besin değerleri (100 g için; düzenlenebilir)</summary>
+      <p class="hint">Seçili ürünün internetten alınan referans değerleri otomatik gelir. Yalnızca doldurulan değerler etikete eklenir; baskıdan önce gerçek ürün belgesiyle doğrulayın.</p>
+      <div class="nutrition-grid">
+        <label>Kalori<input id="nutrition-calories" maxlength="40" placeholder="Örn. 293 kcal"></label>
+        <label>Toplam yağ<input id="nutrition-fat" maxlength="40" placeholder="Örn. 45 g"></label>
+        <label>Karbonhidrat<input id="nutrition-carbohydrate" maxlength="40" placeholder="Örn. 2 g"></label>
+        <label>Şeker<input id="nutrition-sugar" maxlength="40" placeholder="Örn. 2 g"></label>
+        <label>Protein<input id="nutrition-protein" maxlength="40" placeholder="Örn. 8 g"></label>
+        <label>Lif<input id="nutrition-fiber" maxlength="40" placeholder="Örn. 2 g"></label>
+        <label>Sodyum<input id="nutrition-sodium" maxlength="40" placeholder="Örn. 20 mg"></label>
+      </div>
+    </details>
+    <p class="hint">Kaynaklar: <a href="https://fdc.nal.usda.gov/" target="_blank" rel="noopener">USDA FoodData Central</a> ve <a href="https://sanliurfa.tarimorman.gov.tr/Duyuru/339/Turk-Gida-Kodeksi-Baharat-Tebligi-_teblig-No-2022_7_" target="_blank" rel="noopener">TGK Baharat Tebliği (2022/7)</a>. Menşe, reçete, analiz ve çapraz bulaşma bilgileri gerçek ürün kayıtlarından doğrulanmalıdır.</p>
     <label>Bu ürünün TETT tarihi<input id="date" type="date" required></label>
     <p id="lot-preview" class="hint">TETT seçildiğinde aynı tarih otomatik olarak parti/lot numarası olur.</p>
     <p class="hint">Aynı TETT tarihli farklı üretim partileri varsa bu yöntem onları ayırt edemez; baskıdan önce üretim kayıtlarınızı kontrol edin.</p>
-    <label class="check"><input id="verified" type="checkbox">Bu ürünün içerik, menşe, alerjen ve net miktar bilgilerini gerçek ürüne göre doğruladım.</label>
+    <label class="check"><input id="verified" type="checkbox">Bu ürünün içerik, menşei, alerjen, gramaj ve varsa besin değerlerini gerçek ürüne göre doğruladım.</label>
     <button id="add-to-cart-button">Sepete ekle</button>
   </section>
   <section>
@@ -79,13 +96,32 @@
     </details>
   </section>
   <script>
-    const suggestions = {{ suggestions|tojson }};
+    const profiles = {{ profiles|tojson }};
     const defaultStorage = {{ default_storage|tojson }};
     let savedBusiness = {{ business|tojson }};
     const $ = id => document.getElementById(id);
     const cart = [];
+    const nutritionInputIds = {
+      calories:'nutrition-calories',fat:'nutrition-fat',carbohydrate:'nutrition-carbohydrate',
+      sugar:'nutrition-sugar',protein:'nutrition-protein',fiber:'nutrition-fiber',sodium:'nutrition-sodium'
+    };
+    function nutritionValues() {
+      return Object.fromEntries(Object.entries(nutritionInputIds).map(([key,id]) => [key,$(id).value.trim()]));
+    }
+    function clearNutrition() {
+      Object.values(nutritionInputIds).forEach(id => { $(id).value = ''; });
+    }
     function updateSuggestion() {
-      $('ingredients').value = suggestions[$('spice-select').value] || '';
+      const profile = profiles[$('spice-select').value] || {};
+      $('ingredients').value = profile.ingredients || '';
+      $('allergens').value = profile.allergens || '';
+      $('origin').value = '';
+      $('storage').value = defaultStorage;
+      clearNutrition();
+      for (const [key,id] of Object.entries(nutritionInputIds)) {
+        $(id).value = (profile.nutrition || {})[key] || '';
+      }
+      $('profile-note').textContent = profile.note || 'Bu ürün için kayıtlı öneri yok; bilgileri gerçek ürün kayıtlarından girin.';
       $('verified').checked = false;
     }
     $('spice-select').addEventListener('change', updateSuggestion);
@@ -107,7 +143,8 @@
       const list = $('cart-items'); list.replaceChildren();
       for (const [i,item] of cart.entries()) {
         const li = document.createElement('li');
-        const span = document.createElement('span'); span.textContent = `${item.spice} · ${item.weight} · TETT/lot ${formattedDate(item.date)} · ${item.pages} sayfa`;
+        const hasNutrition = Object.values(item.nutrition).some(Boolean);
+        const span = document.createElement('span'); span.textContent = `${item.spice} · ${item.weight} · TETT/lot ${formattedDate(item.date)} · ${item.pages} sayfa${hasNutrition ? ' · Besin değerleri var' : ''}`;
         const button = document.createElement('button'); button.textContent = 'Sil'; button.className = 'danger';
         button.addEventListener('click', () => {cart.splice(i,1);renderCart()});
         li.append(span,button); list.append(li);
@@ -119,8 +156,8 @@
       if (!Number.isInteger(pages) || pages < 1 || pages > 100) return $('status').textContent = 'Sayfa sayısı 1-100 arasında olmalı.';
       const storage = $('storage').value.trim() || defaultStorage;
       $('storage').value = storage;
-      const item = {spice:$('spice-select').value,weight:$('weight-select').value,ingredients:$('ingredients').value.trim(),allergens:$('allergens').value.trim(),origin:$('origin').value.trim(),storage,date:$('date').value,verified:$('verified').checked,pages};
-      if (!item.ingredients || !item.origin || !item.date) return $('status').textContent = 'Ürün alanlarını doldurun.';
+      const item = {spice:$('spice-select').value,weight:$('weight-select').value,ingredients:$('ingredients').value.trim(),allergens:$('allergens').value.trim(),origin:$('origin').value.trim(),storage,date:$('date').value,verified:$('verified').checked,nutrition:nutritionValues(),pages};
+      if (!item.origin || !item.date) return $('status').textContent = 'Zorunlu ürün alanlarını doldurun.';
       if (! $('verified').checked) return $('status').textContent = 'Ürün bilgilerini doğruladığınızı işaretleyin.';
       cart.push(item); renderCart(); $('verified').checked = false; $('status').textContent = `${item.spice} sepete eklendi.`;
     });
@@ -156,7 +193,12 @@
           const link = document.createElement('a');link.href = objectUrl;link.download = 'etiket-onizleme.pdf';link.click();
           setTimeout(() => URL.revokeObjectURL(objectUrl),60000);
           $('status').textContent = 'PDF indirildi. A4 ve %100 ölçekte kontrol edin.';
-        } else { const result = await response.json(); $('status').textContent = result.message; }
+        } else {
+          const result = await response.json();
+          cart.splice(0, cart.length);
+          renderCart();
+          $('status').textContent = result.message;
+        }
       } catch (error) { $('status').textContent = error.message; }
     }
     $('preview-button').addEventListener('click',() => submit('/preview-cart'));

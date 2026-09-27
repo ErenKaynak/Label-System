@@ -31,7 +31,7 @@
 │   Baharat Seçin: [TOZ BİBER    ▼]   │
 │   Gramaj Seçin:  [1 KG         ▼]   │
 │   Sayfa Sayısı:  [1            ]    │
-│   STT:           [10/2027      ]    │
+│   TETT:          [27.09.2027  ]    │
 │                                     │
 │   [      SEPETE EKLE      ]         │
 │─────────────────────────────────────│
@@ -62,7 +62,7 @@
 
 ### 🔧 Güçlü Özellikler
 - 🖨️ Direkt yazıcı entegrasyonu
-- 📅 Otomatik STT hesaplama
+- 📅 Gün/ay/yıl TETT; aynı tarih otomatik parti/lot numarası
 - 🎨 Özelleştirilebilir tasarım
 - 💾 JSON tabanlı veri yönetimi
 
@@ -96,11 +96,17 @@
 ### 📋 Gereksinimler
 
 ```bash
-Python 3.7+
+Python 3.9+
 pip (Python package manager)
 ```
 
-### ⚡ Kurulum
+### ⚡ Windows kurulumu
+
+Proje klasörünün tamamını Windows bilgisayara kopyalayın. Python 3.9 veya üstünü yükleyin. İlk kullanımda `kurulum.bat` dosyasına çift tıklayın; bu dosya `.venv` klasörünü oluşturup `requirements.txt` içindeki paketleri kurar. Daha sonra `baslat.bat` dosyasına çift tıklayın ve tarayıcıda `http://127.0.0.1:5000/` adresini açın. Başlatma dosyası kurulum eksikse kurulumu kendisi de başlatır. Sunucu çalışırken açılan komut penceresini kapatmayın.
+
+Kurulum için internet bağlantısı gerekir. `.venv` klasörünü bir bilgisayardan diğerine taşımayın; her Windows bilgisayarda yeniden oluşturun. Daha önce kaydedilmiş işletme bilgilerini de taşımak istiyorsanız `isletme.json` dosyasını proje klasörüyle birlikte kopyalayın.
+
+### ⚡ macOS / Linux kurulumu
 
 ```bash
 # 1. Repoyu klonlayın
@@ -108,14 +114,14 @@ git clone https://github.com/ErenKaynak/Label-System.git
 cd Label-System
 
 # 2. Gerekli paketleri yükleyin
-pip install flask reportlab
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 
-# 3. Logo dosyasını ekleyin (isteğe bağlı)
-# logo.png dosyasını proje kök dizinine yerleştirin
-
-# 4. Uygulamayı başlatın
-python app.py
+# 3. Uygulamayı başlatın
+.venv/bin/python app.py
 ```
+
+macOS'te 5000 portu doluysa `PORT=5001 .venv/bin/python app.py` komutunu kullanın ve `http://localhost:5001` adresini açın.
 
 ### 🌐 Erişim
 
@@ -137,20 +143,20 @@ http://[BİLGİSAYAR-ADI].local:5000
 
 ### 1️⃣ Etiket Oluşturma
 
-```plaintext
-1. Baharat türünü seçin (örn: TOZ BİBER)
-2. Gramajı seçin (örn: 1 KG)
-3. Sayfa sayısını girin (her sayfa = 10 etiket)
-4. Son tüketim tarihini seçin
-5. "SEPETE EKLE" butonuna tıklayın
-```
+1. Etiket düzenini seçin: yatay 148,5 × 42 mm, dikey 59,4 × 105 mm veya önceki 105 × 59,4 mm düzen.
+2. Baharat, net miktar ve sayfa sayısını seçin.
+3. İçindekiler, alerjen ve menşe bilgilerini gerçek ürüne göre doldurup doğrulayın. Muhafaza koşulu otomatik gelir; ürüne uymuyorsa düzeltin.
+4. Her ürünün TETT tarihini seçin. Aynı tarih etikette parti/lot numarası olarak kullanılır.
+5. İşletmeci adı, tam adresi ve kayıt numarasını bir kez girip **İşletme bilgilerini kaydet** düğmesine basın. Sonraki açılışlarda alanlar otomatik dolar.
+6. Sepete ekleyin; PDF önizlemesini kontrol ettikten sonra yazdırın.
 
 ### 2️⃣ Toplu Yazdırma
 
 ```plaintext
 1. Sepete birden fazla ürün ekleyin
-2. "TÜMÜNÜ YAZDIR" butonuna tıklayın
-3. PDF otomatik olarak yazıcıya gönderilir
+2. "PDF ÖNİZLEME İNDİR" ile sayfayı kontrol edin
+3. "TÜMÜNÜ YAZDIR" butonuna tıklayın
+4. PDF varsayılan yazıcıya gönderilir
 ```
 
 ### 3️⃣ Yeni Ürün Ekleme
@@ -164,58 +170,25 @@ http://[BİLGİSAYAR-ADI].local:5000
 
 ---
 
-## 📦 Etiket Tasarımı
+## 📦 Etiket Tasarımı ve mevzuat
 
-### 🎨 Etiket İçeriği
+A4 üzerinde 2 sütun × 5 satır vardır. Yatay etiket **148,5 × 42 mm** ölçüsündedir. Dikey etiket, A4 dikey sayfadaki 105 × 59,4 mm hücrenin içeriği 90° döndürülerek **59,4 × 105 mm** yönünde okunur. Önceki yatay içerikli A4 dikey düzen de korunur. `logo.png` dikey etikette yazıların üstüne, yatay etikette geniş bir sol alana otomatik yerleştirilir. İçerikte 9 pt, başlıkta 10–13 pt gömülü Türkçe TrueType font kullanılır. Baskıyı **gerçek boyut / %100 ölçek** ile alın ve fiziksel boyutu ölçün. Zorunlu bilgilerin okunurluğu ve x-yüksekliği, gerçek baskıda da kontrol edilmelidir.
 
-<table>
-<tr>
-<td width="30%"><b>Bölüm</b></td>
-<td width="40%"><b>İçerik</b></td>
-<td width="30%"><b>Font</b></td>
-</tr>
-<tr>
-<td>🖼️ Logo</td>
-<td>Firma logosu (90x30mm)</td>
-<td>-</td>
-</tr>
-<tr>
-<td>📝 Ürün Adı</td>
-<td>Baharat + Gramaj</td>
-<td>Arial Bold 12pt</td>
-</tr>
-<tr>
-<td>📅 STT</td>
-<td>MM / YYYY</td>
-<td>Arial 9pt</td>
-</tr>
-<tr>
-<td>🏷️ Parti No</td>
-<td>Sabit metin</td>
-<td>Arial 8pt</td>
-</tr>
-<tr>
-<td>🏢 İşletme No</td>
-<td>TR-XX-X-XXXXXX</td>
-<td>Arial 8pt</td>
-</tr>
-<tr>
-<td>📍 Adres</td>
-<td>Firma adresi</td>
-<td>Arial 8pt</td>
-</tr>
-</table>
+Etiket; ürün adı, net miktar, içindekiler, varsa alerjenler, menşe, muhafaza koşulu, TETT, parti/lot açıklaması, işletmeci adı ve adresi ile işletme kayıt numarasını içerir. TETT gün/ay/yıl biçiminde basılır ve aynı tarih parti/lot işareti sayılır; etikette “Parti/lot numarası, tavsiye edilen tüketim tarihidir.” açıklaması yer alır. **Aynı TETT tarihini taşıyan farklı üretim partileri varsa yalnızca tarih bunları ayırt etmez.** Bu durumda gerçek üretim kayıtlarına uygun ayrı bir parti kodu ve etiket düzeni gerekir. İşletme bilgileri yalnızca bu bilgisayardaki `isletme.json` dosyasına kaydedilir; dosya sürüm kontrolü dışında tutulur. Tek baharat ve baharat karışımlarında beslenme bildirimi istisnası olabilir; yağ/tuz gibi ekler bu durumu değiştirebilir. Kekikte gerçek cins adı ürün adı veya bileşen listesinde belirtilmelidir. Ürün reçeteleri ve raf ömrü internetten güvenilir biçimde belirlenemeyeceği için program yalnızca örnek içerik önerir ve doğrulama ister. Alerjen alanına yazılan ve içindekiler metninde geçen maddeler listede kalın gösterilir; özel ürün kuralları ve baskıdaki okunurluk ayrıca kontrol edilmelidir.
 
-### 📐 Teknik Özellikler
+Başvurulan resmi kaynaklar:
 
-```plaintext
-├─ Sayfa Formatı: A4 (210 x 297 mm)
-├─ Etiket Düzeni: 2 sütun × 5 satır
-├─ Toplam Etiket: 10 etiket/sayfa
-├─ Etiket Boyutu: 105 × 59.4 mm
-├─ Marj: 0 mm
-└─ Logo Boyutu: 90 × 30 mm
-```
+- [TGK Gıda Etiketleme ve Tüketicileri Bilgilendirme Yönetmeliği](https://istanbul.tarimorman.gov.tr/Belgeler/SolMenu/RESM%C4%B0%20GAZETE/GidaEtiketlemeYonetmeligi.pdf)
+- [TGK Baharat Tebliği 2022/7](https://sanliurfa.tarimorman.gov.tr/Duyuru/339/Turk-Gida-Kodeksi-Baharat-Tebligi-_teblig-No-2022_7_)
+- [2026/11 parti/lot tebliği duyurusu](https://www.tarimorman.gov.tr/HHGM/Haber/221/Turk-Gida-Kodeksi-Gidalarin-Ait-Oldugu-Partiyi-Tanimlayan-Isaretler-Veya-Numaralar-Hakkinda-Teblig-_teblig-No2026_11_-Yayimlanmistir)
+- [Bakanlık etiketleme açıklamaları](https://istanbul.tarimorman.gov.tr/Duyuru/465/Tgk-Etiketleme-Ve-Tuketicileri-Bilgilendirme-Yonetmeligi-Ve-Tgk-Etiketleme-Ve-Tuketicileri-Bilgilendirme-Yonetmeligi-Kilavuzunda-Yapilan-Degisikliklere-Iliskin-Aciklamalar)
+
+### 🖨️ Baskı kontrolü
+
+Önce PDF önizlemesini normal A4 kâğıda **gerçek boyut / %100 ölçek** ile yazdırın; "sayfaya sığdır" seçeneğini kapatın. Çıktıyı etiket kâğıdının üzerine koyup 2 × 5 kesim çizgileriyle hizayı ışığa tutarak kontrol edin. Fiziksel yazıcı payı ve etiket kâğıdının gerçek kesimi yazılım tarafından ölçülemez; seri baskıdan önce tek sayfalık deneme yapın.
+
+macOS ve Linux'ta doğrudan yazdırma için sistemde varsayılan yazıcı tanımlı ve `lp` komutu kullanılabilir olmalıdır. Yazıcı tanımlı değilse uygulama hata gösterir; PDF önizlemesi yine indirilebilir.
+Windows'ta doğrudan yazdırma, varsayılan PDF uygulamasının **Yazdır** komutunu desteklemesine bağlıdır. Bu komut çalışmazsa PDF önizlemesini indirip PDF uygulamasından A4 ve %100 ölçekte yazdırın.
 
 ---
 
@@ -225,9 +198,12 @@ http://[BİLGİSAYAR-ADI].local:5000
 Label-System/
 │
 ├── 📄 app.py                    # Ana Flask uygulaması
+├── 📄 requirements.txt          # Python paketleri
+├── 📄 kurulum.bat               # Windows ilk kurulum
+├── 📄 baslat.bat                # Windows başlatma
 ├── 📊 baharatlar.json          # Ürün veritabanı
-├── 🖼️ logo.png                 # Firma logosu
-├── 📄 etiket.pdf               # Oluşturulan PDF (otomatik)
+├── 🖼️ logo.png                 # Etiketlerde kullanılan firma logosu
+├── 📄 etiket.pdf               # Doğrudan yazdırmada oluşturulan PDF
 │
 ├── 📁 Templates/
 │   └── 🌐 index.html           # Ana web arayüzü
@@ -246,33 +222,31 @@ Label-System/
 | Endpoint | Method | Açıklama | Parametreler |
 |----------|--------|----------|--------------|
 | `/` | GET | Ana sayfa | - |
-| `/print-cart` | POST | Sepeti yazdır | `cart`, `date` |
+| `/save-business` | POST | Tek işletmenin bilgilerini yerel dosyaya kaydet | `operator`, `address`, `registration` |
+| `/preview-cart` | POST | PDF indir | `cart`, `common`, `orientation` |
+| `/print-cart` | POST | Sepeti yazdır | `cart`, `common`, `orientation` |
 | `/add-spice` | POST | Yeni baharat ekle | `spice_name` |
 | `/add-weight` | POST | Yeni gramaj ekle | `weight_name` |
 | `/manifest.json` | GET | PWA manifest | - |
 | `/static/<path>` | GET | Statik dosyalar | - |
 
-### 📤 Örnek POST Request
+### 📤 Örnek PDF isteği
 
 ```javascript
-// Sepeti yazdır
-fetch('/print-cart', {
+fetch('/preview-cart', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    cart: [
-      { label: "TOZ BİBER    1 KG", pages: 2 }
-    ],
-    date: "2027-10"
-  })
-});
-
-// Yeni baharat ekle
-fetch('/add-spice', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    spice_name: "ZERDEÇAL"
+    orientation: 'landscape',
+    common: {
+      operator: 'İşletmeci adı', address: 'Tam adres',
+      registration: 'TR-...'
+    },
+    cart: [{
+      spice: 'KİMYON', weight: '500 GR', ingredients: 'Kimyon',
+      allergens: '', origin: 'Türkiye',
+      date: '2027-09-27', verified: true, pages: 1
+    }]
   })
 });
 ```
@@ -303,41 +277,16 @@ fetch('/add-spice', {
 
 ### 🎨 Etiket Özelleştirme
 
-`app.py` dosyasında aşağıdaki değişkenleri düzenleyerek etiket tasarımını özelleştirebilirsiniz:
-
-```python
-# Sayfa ayarları
-PAGE_W, PAGE_H = A4
-TOP_MARGIN = 0 * mm
-LEFT_MARGIN = 0 * mm
-
-# Etiket boyutları
-ETIKET_GENISLIK = PAGE_W / 2
-ETIKET_YUKSEKLIK = PAGE_H / 5
-
-# Logo boyutları
-LOGO_GENISLIK = 90 * mm
-LOGO_YUKSEKLIK = 30 * mm
-```
+Sayfa yönü arayüzden seçilir. Ürün verileri baskı öncesinde arayüzden girilir. `baharatlar.json` yalnızca baharat ve gramaj seçeneklerini tutar.
 
 ---
 
 ## 🐛 Sorun Giderme
 
 <details>
-<summary><b>❌ "Arial fontları bulunamadı" hatası</b></summary>
+<summary><b>❌ "Font bulunamadı" hatası</b></summary>
 
-**Çözüm (Windows):**
-```python
-# app.py içinde zaten doğru yol tanımlı
-pdfmetrics.registerFont(TTFont('Arial', 'C:/Windows/Fonts/arial.ttf'))
-```
-
-**Çözüm (Linux/Mac):**
-```python
-# Font yolunu sistem fontlarınıza göre güncelleyin
-pdfmetrics.registerFont(TTFont('Arial', '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf'))
-```
+Uygulama Windows ve macOS Arial fontlarını, Linux'ta Liberation Sans veya DejaVu Sans fontlarını otomatik arar. Bu font ailelerinden birini normal ve kalın dosyalarıyla kurup uygulamayı yeniden başlatın.
 </details>
 
 <details>
@@ -359,17 +308,11 @@ New-NetFirewallRule -DisplayName "Flask App" -Direction Inbound -LocalPort 5000 
 <summary><b>🖨️ PDF yazdırma çalışmıyor</b></summary>
 
 **Çözüm:**
-- ✅ Varsayılan PDF görüntüleyici tanımlı mı?
 - ✅ Yazıcı bağlantısı aktif mi?
-- ✅ Windows kullanıyorsunuz? (`os.startfile` sadece Windows'ta çalışır)
+- ✅ Yazıcı sistemde varsayılan olarak tanımlı mı?
+- ✅ Baskı ayarında A4 ve %100 ölçek seçili mi?
 
-**Alternatif (Linux/Mac):**
-```python
-# app.py içinde os.startfile yerine:
-import subprocess
-subprocess.run(['lpr', PDF_FILE_NAME])  # Linux
-subprocess.run(['open', '-a', 'Preview', PDF_FILE_NAME])  # Mac
-```
+**Linux/Mac:** `lpstat -p -d` komutuyla varsayılan yazıcıyı kontrol edin.
 </details>
 
 ---

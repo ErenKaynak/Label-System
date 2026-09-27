@@ -1,0 +1,7 @@
+isletme.json
+isletme.json.tmp
+__pycache__/
+*.pyc
+.venv/
+etiket.pdf
+output/

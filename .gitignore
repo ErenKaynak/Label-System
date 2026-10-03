@@ -5,3 +5,4 @@ __pycache__/
 .venv/
 etiket.pdf
 output/
+.ssh/beykoz-tto

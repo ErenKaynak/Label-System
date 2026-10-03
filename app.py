@@ -225,8 +225,11 @@ def draw_nutrition_table(c, nutrition, x, y, width, columns=2):
     row_height = 7.5
     gap = 2 * mm
     column_width = (width - gap * (columns - 1)) / columns
+    heading = 'Besin Değerleri (100 gr için)'
+    if pdfmetrics.stringWidth(heading, 'Label-Bold', heading_size) > width:
+        raise ValueError(f'Etiket alanına sığmıyor: {heading}')
     c.setFont('Label-Bold', heading_size)
-    c.drawString(x, y, 'Besin Değerleri')
+    c.drawString(x, y, heading)
     c.setLineWidth(0.3)
     c.line(x, y - 2.5, x + width, y - 2.5)
     y -= 9.5

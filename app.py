@@ -181,6 +181,19 @@ def draw_ingredients(c, ingredients, allergens, x, y, width):
     return y - height
 
 
+def format_tett(value):
+    """TETT'i ay/yıl olarak biçimlendirir: '2027-09' -> '09.2027'.
+
+    Eski istemcilerden gelen gün/ay/yıl ('2027-09-27') da kabul edilir; gün atılır.
+    """
+    for pattern in ('%Y-%m', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(value, pattern).strftime('%m.%Y')
+        except ValueError:
+            pass
+    raise ValueError('TETT geçerli bir ay/yıl olmalıdır.')
+
+
 def draw_tett(c, date, x, y, width, line_height=LINE_HEIGHT):
     text = 'TETT: ' + date
     if pdfmetrics.stringWidth(text, 'Label-Bold', BODY_SIZE) > width:
@@ -396,10 +409,7 @@ def prepare_pdf_from_request():
             ('origin', 'Menşei'), ('date', 'TETT'))}
         item['ingredients'] = optional_text(raw.get('ingredients'), 'İçindekiler')
         item['storage'] = required_text(raw.get('storage') or DEFAULT_STORAGE, 'Muhafaza koşulu')
-        try:
-            item['date'] = datetime.strptime(item['date'], '%Y-%m-%d').strftime('%d.%m.%Y')
-        except ValueError:
-            raise ValueError('TETT geçerli bir gün/ay/yıl olmalıdır.') from None
+        item['date'] = format_tett(item['date'])
         if raw.get('verified') is not True:
             raise ValueError(f"{item['spice']} için ürün bilgilerini doğrulayın.")
         item['allergens'] = str(raw.get('allergens') or '').strip()

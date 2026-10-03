@@ -31,7 +31,7 @@
 │   Baharat Seçin: [TOZ BİBER    ▼]   │
 │   Gramaj Seçin:  [1 KG         ▼]   │
 │   Sayfa Sayısı:  [1            ]    │
-│   TETT:          [27.09.2027  ]    │
+│   TETT:          [09.2027     ]    │
 │                                     │
 │   [      SEPETE EKLE      ]         │
 │─────────────────────────────────────│
@@ -62,7 +62,7 @@
 
 ### 🔧 Güçlü Özellikler
 - 🖨️ Direkt yazıcı entegrasyonu
-- 📅 Gün/ay/yıl TETT; aynı tarih otomatik parti/lot numarası
+- 📅 Ay/yıl TETT; aynı tarih otomatik parti/lot numarası
 - 🎨 Özelleştirilebilir tasarım
 - 💾 JSON tabanlı veri yönetimi
 
@@ -146,7 +146,7 @@ http://[BİLGİSAYAR-ADI].local:5000
 1. Etiket düzenini seçin: yatay 148,5 × 42 mm, dikey 59,4 × 105 mm veya önceki 105 × 59,4 mm düzen.
 2. Baharat, net miktar ve sayfa sayısını seçin.
 3. İçindekiler, alerjen ve menşe bilgilerini gerçek ürüne göre doldurup doğrulayın. Muhafaza koşulu otomatik gelir; ürüne uymuyorsa düzeltin.
-4. Her ürünün TETT tarihini seçin. Aynı tarih etikette parti/lot numarası olarak kullanılır.
+4. Her ürünün TETT ayını ve yılını seçin. Aynı tarih etikette parti/lot numarası olarak kullanılır.
 5. İşletmeci adı, tam adresi ve kayıt numarasını bir kez girip **İşletme bilgilerini kaydet** düğmesine basın. Sonraki açılışlarda alanlar otomatik dolar.
 6. Sepete ekleyin; PDF önizlemesini kontrol ettikten sonra yazdırın.
 
@@ -174,7 +174,7 @@ http://[BİLGİSAYAR-ADI].local:5000
 
 A4 üzerinde 2 sütun × 5 satır vardır. Yatay etiket **148,5 × 42 mm** ölçüsündedir. Dikey etiket, A4 dikey sayfadaki 105 × 59,4 mm hücrenin içeriği 90° döndürülerek **59,4 × 105 mm** yönünde okunur. Önceki yatay içerikli A4 dikey düzen de korunur. `logo.png` dikey etikette yazıların üstüne, yatay etikette geniş bir sol alana otomatik yerleştirilir. İçerikte 9 pt, başlıkta 10–13 pt gömülü Türkçe TrueType font kullanılır. Baskıyı **gerçek boyut / %100 ölçek** ile alın ve fiziksel boyutu ölçün. Zorunlu bilgilerin okunurluğu ve x-yüksekliği, gerçek baskıda da kontrol edilmelidir.
 
-Etiket; ürün adı, net miktar, içindekiler, varsa alerjenler, menşe, muhafaza koşulu, TETT, parti/lot açıklaması, işletmeci adı ve adresi ile işletme kayıt numarasını içerir. TETT gün/ay/yıl biçiminde basılır ve aynı tarih parti/lot işareti sayılır; etikette “Parti/lot numarası, tavsiye edilen tüketim tarihidir.” açıklaması yer alır. **Aynı TETT tarihini taşıyan farklı üretim partileri varsa yalnızca tarih bunları ayırt etmez.** Bu durumda gerçek üretim kayıtlarına uygun ayrı bir parti kodu ve etiket düzeni gerekir. İşletme bilgileri yalnızca bu bilgisayardaki `isletme.json` dosyasına kaydedilir; dosya sürüm kontrolü dışında tutulur. Tek baharat ve baharat karışımlarında beslenme bildirimi istisnası olabilir; yağ/tuz gibi ekler bu durumu değiştirebilir. Kekikte gerçek cins adı ürün adı veya bileşen listesinde belirtilmelidir. Ürün reçeteleri ve raf ömrü internetten güvenilir biçimde belirlenemeyeceği için program yalnızca örnek içerik önerir ve doğrulama ister. Alerjen alanına yazılan ve içindekiler metninde geçen maddeler listede kalın gösterilir; özel ürün kuralları ve baskıdaki okunurluk ayrıca kontrol edilmelidir.
+Etiket; ürün adı, net miktar, içindekiler, varsa alerjenler, menşe, muhafaza koşulu, TETT, parti/lot açıklaması, işletmeci adı ve adresi ile işletme kayıt numarasını içerir. TETT ay/yıl biçiminde basılır ve aynı tarih parti/lot işareti sayılır; etikette “Parti/lot numarası, tavsiye edilen tüketim tarihidir.” açıklaması yer alır. **Aynı TETT tarihini taşıyan farklı üretim partileri varsa yalnızca tarih bunları ayırt etmez.** Bu durumda gerçek üretim kayıtlarına uygun ayrı bir parti kodu ve etiket düzeni gerekir. İşletme bilgileri yalnızca bu bilgisayardaki `isletme.json` dosyasına kaydedilir; dosya sürüm kontrolü dışında tutulur. Tek baharat ve baharat karışımlarında beslenme bildirimi istisnası olabilir; yağ/tuz gibi ekler bu durumu değiştirebilir. Kekikte gerçek cins adı ürün adı veya bileşen listesinde belirtilmelidir. Ürün reçeteleri ve raf ömrü internetten güvenilir biçimde belirlenemeyeceği için program yalnızca örnek içerik önerir ve doğrulama ister. Alerjen alanına yazılan ve içindekiler metninde geçen maddeler listede kalın gösterilir; özel ürün kuralları ve baskıdaki okunurluk ayrıca kontrol edilmelidir.
 
 Başvurulan resmi kaynaklar:
 
@@ -245,7 +245,7 @@ fetch('/preview-cart', {
     cart: [{
       spice: 'KİMYON', weight: '500 GR', ingredients: 'Kimyon',
       allergens: '', origin: 'Türkiye',
-      date: '2027-09-27', verified: true, pages: 1
+      date: '2027-09', verified: true, pages: 1
     }]
   })
 });

@@ -64,7 +64,18 @@
       </div>
     </details>
     <p class="hint">Kaynaklar: <a href="https://fdc.nal.usda.gov/" target="_blank" rel="noopener">USDA FoodData Central</a> ve <a href="https://sanliurfa.tarimorman.gov.tr/Duyuru/339/Turk-Gida-Kodeksi-Baharat-Tebligi-_teblig-No-2022_7_" target="_blank" rel="noopener">TGK Baharat Tebliği (2022/7)</a>. Menşe, reçete, analiz ve çapraz bulaşma bilgileri gerçek ürün kayıtlarından doğrulanmalıdır.</p>
-    <label>Bu ürünün TETT tarihi<input id="date" type="date" required></label>
+    <label>Bu ürünün TETT tarihi (ay/yıl)
+      <span style="display:flex;gap:8px">
+        <select id="date-month" required aria-label="TETT ayı">
+          <option value="">Ay</option>
+          <option value="01">01 · Ocak</option><option value="02">02 · Şubat</option><option value="03">03 · Mart</option>
+          <option value="04">04 · Nisan</option><option value="05">05 · Mayıs</option><option value="06">06 · Haziran</option>
+          <option value="07">07 · Temmuz</option><option value="08">08 · Ağustos</option><option value="09">09 · Eylül</option>
+          <option value="10">10 · Ekim</option><option value="11">11 · Kasım</option><option value="12">12 · Aralık</option>
+        </select>
+        <select id="date-year" required aria-label="TETT yılı"><option value="">Yıl</option></select>
+      </span>
+    </label>
     <p id="lot-preview" class="hint">TETT seçildiğinde aynı tarih otomatik olarak parti/lot numarası olur.</p>
     <p class="hint">Aynı TETT tarihli farklı üretim partileri varsa bu yöntem onları ayırt edemez; baskıdan önce üretim kayıtlarınızı kontrol edin.</p>
     <label class="check"><input id="verified" type="checkbox">Bu ürünün içerik, menşei, alerjen, gramaj ve varsa besin değerlerini gerçek ürüne göre doğruladım.</label>
@@ -127,17 +138,26 @@
     $('spice-select').addEventListener('change', updateSuggestion);
     updateSuggestion();
     function formattedDate(value) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
-      const [year,month,day] = value.split('-');
-      return `${day}.${month}.${year}`;
+      if (!/^\d{4}-\d{2}$/.test(value)) return '';
+      const [year,month] = value.split('-');
+      return `${month}.${year}`;
+    }
+    // TETT ay/yıl olarak seçilir; sunucuya YYYY-AA gider.
+    function tettValue() {
+      const month = $('date-month').value, year = $('date-year').value;
+      return month && year ? `${year}-${month}` : '';
+    }
+    for (let year = new Date().getFullYear(), last = year + 6; year <= last; year++) {
+      $('date-year').add(new Option(String(year), String(year)));
     }
     function updateLotPreview() {
-      const date = formattedDate($('date').value);
+      const date = formattedDate(tettValue());
       $('lot-preview').textContent = date
         ? `Parti/lot numarası: ${date} (TETT ile aynı).`
         : 'TETT seçildiğinde aynı tarih otomatik olarak parti/lot numarası olur.';
     }
-    $('date').addEventListener('change', updateLotPreview);
+    $('date-month').addEventListener('change', updateLotPreview);
+    $('date-year').addEventListener('change', updateLotPreview);
     updateLotPreview();
     function renderCart() {
       const list = $('cart-items'); list.replaceChildren();
@@ -156,7 +176,7 @@
       if (!Number.isInteger(pages) || pages < 1 || pages > 100) return $('status').textContent = 'Sayfa sayısı 1-100 arasında olmalı.';
       const storage = $('storage').value.trim() || defaultStorage;
       $('storage').value = storage;
-      const item = {spice:$('spice-select').value,weight:$('weight-select').value,ingredients:$('ingredients').value.trim(),allergens:$('allergens').value.trim(),origin:$('origin').value.trim(),storage,date:$('date').value,verified:$('verified').checked,nutrition:nutritionValues(),pages};
+      const item = {spice:$('spice-select').value,weight:$('weight-select').value,ingredients:$('ingredients').value.trim(),allergens:$('allergens').value.trim(),origin:$('origin').value.trim(),storage,date:tettValue(),verified:$('verified').checked,nutrition:nutritionValues(),pages};
       if (!item.origin || !item.date) return $('status').textContent = 'Zorunlu ürün alanlarını doldurun.';
       if (! $('verified').checked) return $('status').textContent = 'Ürün bilgilerini doğruladığınızı işaretleyin.';
       cart.push(item); renderCart(); $('verified').checked = false; $('status').textContent = `${item.spice} sepete eklendi.`;

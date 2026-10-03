@@ -47,7 +47,7 @@
     <p id="profile-note" class="notice"></p>
     <div class="grid">
       <label>Alerjenler (varsa; içerikteki alerjenleri açıkça belirtin)<input id="allergens" placeholder="Tedarikçi/üretim kaydından doğrulayın"></label>
-      <label>Menşei<input id="origin" placeholder="Tedarikçi belgesindeki ülke" required></label>
+      <label>Menşei<input id="origin" value="Türkiye" placeholder="Tedarikçi belgesindeki ülke" required></label>
     </div>
     <label>Muhafaza koşulu<input id="storage" value="{{ default_storage }}" required></label>
     <details class="optional-fields">
@@ -115,7 +115,7 @@
       const profile = profiles[$('spice-select').value] || {};
       $('ingredients').value = profile.ingredients || '';
       $('allergens').value = profile.allergens || '';
-      $('origin').value = '';
+      $('origin').value = profile.origin || 'Türkiye';
       $('storage').value = defaultStorage;
       clearNutrition();
       for (const [key,id] of Object.entries(nutritionInputIds)) {

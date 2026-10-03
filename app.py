@@ -145,13 +145,16 @@ def wrap_text(text, font, size, width):
 
 
 def draw_lines(c, text, x, y, width, font='Label-Regular', size=BODY_SIZE,
-               max_lines=2, line_height=LINE_HEIGHT):
+               max_lines=2, line_height=LINE_HEIGHT, center=False):
     lines = wrap_text(text, font, size, width)
     if len(lines) > max_lines:
         raise ValueError(f'Etiket alanına sığmıyor: {text[:45]}... Metni kısaltın.')
     c.setFont(font, size)
     for line in lines:
-        c.drawString(x, y, line)
+        if center:
+            c.drawCentredString(x + width / 2, y, line)
+        else:
+            c.drawString(x, y, line)
         y -= line_height
     return y
 
@@ -255,7 +258,7 @@ def draw_label(c, x, y, width, height, item, common):
     if pdfmetrics.stringWidth(title, 'Label-Bold', title_size) > inner:
         raise ValueError(f'Ürün adı ve gramaj etikete sığmıyor: {name}')
     c.setFont('Label-Bold', title_size)
-    c.drawString(lx, top, title)
+    c.drawCentredString(lx + inner / 2, top, title)
     c.setLineWidth(0.35)
     c.line(lx, top - 4, x + width - pad, top - 4)
 
@@ -305,7 +308,7 @@ def draw_vertical_label(c, width, height, item, common):
     bottom = pad + 5
 
     y = draw_lines(c, f"{item['spice']}   {item['weight']}", x, y, text_width,
-                   font='Label-Bold', size=13, max_lines=2)
+                   font='Label-Bold', size=13, max_lines=2, center=True)
     c.setLineWidth(0.4)
     c.line(x, y + 2, width - pad, y + 2)
     y -= 6

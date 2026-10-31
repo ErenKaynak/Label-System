@@ -74,7 +74,7 @@ def create_labels_pdf(spice_name, page_count, uretim_tarihi_str):
 
         # 6. ADRES (İSTEK: 6pt, Tek Satır)
         c.setFont('Arial', 6) 
-        c.drawCentredString(x_center, y_next_line, "LİDER BAHARAT yücel Kaynak petroliş mh refah sk no 16 kartal")
+        c.drawCentredString(x_center, y_next_line, "LİDER BAHARAT Yücel Kaynak +905555025181 petroliş mh refah sk no 16 Kartal İstanbul")
         # Bu son satır, altına boşluk gerekmiyor.
 
     # --- ANA DÖNGÜ ---

@@ -29,6 +29,11 @@ LOGO_PATH = os.path.join(BASE_DIR, 'logo.png')
 json_lock = threading.RLock()
 DEFAULT_STORAGE = 'Serin, kuru ve güneşten uzak tutunuz.'
 LOT_STATEMENT = 'Parti/lot numarası, tavsiye edilen tüketim tarihidir.'
+DEFAULT_BUSINESS = {
+    'operator': 'Yücel Kaynak +905555025181',
+    'address': 'Petroliş Mah. Refah Sok. No: 16 Kartal İstanbul',
+    'registration': '',
+}
 logo = ImageReader(LOGO_PATH)
 logo_source_width, logo_source_height = logo.getSize()
 # logo.png içindeki görünür çizimin yatay merkezi (beyaz kenarlar hariç).
@@ -87,7 +92,7 @@ def save_json_data(data):
 def load_business_settings():
     with json_lock:
         if not os.path.exists(BUSINESS_PATH):
-            return {'operator': '', 'address': '', 'registration': ''}
+            return DEFAULT_BUSINESS.copy()
         with open(BUSINESS_PATH, encoding='utf-8') as file:
             saved = json.load(file)
         return {key: str(saved.get(key, '')) for key in ('operator', 'address', 'registration')}

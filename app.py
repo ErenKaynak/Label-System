@@ -543,5 +543,9 @@ def serve_static(filename):
     return send_from_directory(STATIC_PATH, filename)
 
 
+# Kayıtlı eski işletme bilgisini servis başlarken bir kez güncelle.
+load_business_settings()
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', '5000')))

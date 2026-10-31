@@ -95,7 +95,13 @@ def load_business_settings():
             return DEFAULT_BUSINESS.copy()
         with open(BUSINESS_PATH, encoding='utf-8') as file:
             saved = json.load(file)
-        return {key: str(saved.get(key, '')) for key in ('operator', 'address', 'registration')}
+        business = {key: str(saved.get(key, '')) for key in ('operator', 'address', 'registration')}
+        if (business['operator'] == 'Yücel Kaynak'
+                and business['address'] == 'Petroliş mah refah sk. no16/2'):
+            business['operator'] = DEFAULT_BUSINESS['operator']
+            business['address'] += ' Kartal İstanbul'
+            return save_business_settings(business)
+        return business
 
 
 def save_business_settings(data):

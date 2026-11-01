@@ -334,8 +334,11 @@ def draw_vertical_label(c, width, height, item, common):
     y = height - pad - vertical_logo_height - 3 * mm
     bottom = pad + 5
 
-    y = draw_lines(c, f"{item['spice']}   {item['weight']}", x, y, text_width,
-                   font='Label-Bold', size=13, max_lines=2, center=True)
+    title = f"{item['spice']}   {item['weight']}"
+    title_size = next((size for size in (13, 12, 11, 10)
+                       if pdfmetrics.stringWidth(title, 'Label-Bold', size) <= text_width), 13)
+    y = draw_lines(c, title, x, y, text_width,
+                   font='Label-Bold', size=title_size, max_lines=2, center=True)
     c.setLineWidth(0.4)
     c.line(x, y + 2, width - pad, y + 2)
     y -= 6
